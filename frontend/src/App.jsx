@@ -1,4 +1,4 @@
-import {ClerkProviderWithRoutes} from "./"
+import {ClerkProviderWithRoutes} from "./auth/ClerkProviderWithRoutes.jsx"
 import {Routes, Route} from "react-router-dom"
 import {Layout} from "./layout/layout.jsx"
 import {TradeLog} from "./trades/TradeLog.jsx"
