@@ -1,0 +1,6 @@
+clerk-sdk-python>=0.1.0
+fastapi>=0.115.12
+openai>=1.86.0
+python-dotenv>=1.1.0
+sqlalchemy>=2.0.41
+uvicorn>=0.34.3
