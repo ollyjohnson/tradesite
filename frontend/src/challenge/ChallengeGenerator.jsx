@@ -3,7 +3,7 @@ import {useState, useEffect} from "react"
 import {MCQChallenge} from "./MCQChallenge.jsx";
 import {useApi} from "../utils/api.js"
 
-export function TradeLog() {
+export function ChallengeGenerator() {
     const [challenge, setChallenge] = useState(null)
     const [isLoading, setIsLoading] = useState(false)
     const [error, setError] = useState(null)

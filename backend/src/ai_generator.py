@@ -1,7 +1,11 @@
 import os
 import json
+
 from openai import OpenAI
 from typing import Dict, Any
+from dotenv import load_dotenv
+
+load_dotenv()
 
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
@@ -24,17 +28,16 @@ def generate_challenge_with_ai(difficulty: str) -> Dict[str, Any]:
 
     Make sure the options are plausible but with only one clearly correct answer.
     """
-
     try:
+        print(os.getenv("OPENAI_API_KEY"))
         response = client.chat.completions.create(
-            model = "gpt-3.5-turbo-0125"
+            model="gpt-3.5-turbo-0125",
             messages=[
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": f"Generate a {difficulty} difficulty coding challenge."}
             ],
-            response_format={"type":"json_object"},
+            response_format={"type": "json_object"},
             temperature=0.7
-
         )
 
         content = response.choices[0].message.content
@@ -44,19 +47,19 @@ def generate_challenge_with_ai(difficulty: str) -> Dict[str, Any]:
         for field in required_fields:
             if field not in challenge_data:
                 raise ValueError(f"Missing required field: {field}")
-            
-            return challenge_data
+
+        return challenge_data
 
     except Exception as e:
         print(e)
-        return{
+        return {
             "title": "Basic Python List Operation",
             "options": [
                 "my_list.append(5)",
                 "my_list.add(5)",
                 "my_list.push(5)",
                 "my_list.insert(5)",
-                ],
-            "correct_answer_id":0,
+            ],
+            "correct_answer_id": 0,
             "explanation": "In Python, append() is the correct method to add an element to the end of a list."
         }

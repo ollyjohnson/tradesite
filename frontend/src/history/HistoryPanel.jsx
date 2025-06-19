@@ -1,6 +1,6 @@
 import "react"
 import {useState, useEffect} from "react"
-import {MCQChallenge} from "../trades/MCQChallenge.jsx";
+import {MCQChallenge} from "../challenge/MCQChallenge.jsx";
 import {useApi} from "../utils/api.js";
 
 export function HistoryPanel() {

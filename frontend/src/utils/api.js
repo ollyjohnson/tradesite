@@ -6,26 +6,26 @@ export const useApi = () => {
     const makeRequest = async (endpoint, options = {}) => {
         const token = await getToken()
         const defaultOptions = {
-            headers:{
+            headers: {
                 "Content-Type": "application/json",
-                "Authorisation": `Bearer ${token}`
+                "Authorization": `Bearer ${token}`
             }
         }
-        
-        const repsonse = await fetch(`http://localhost:8000/api/${endpoint}`{
+
+        const response = await fetch(`http://localhost:8000/api/${endpoint}`, {
             ...defaultOptions,
-          ...options,
+            ...options,
         })
 
-        if (!repsonse.ok){
-            const errorData = await repsonse.json().catch(() => null)
-            if (Response.status === 429) {
+        if (!response.ok) {
+            const errorData = await response.json().catch(() => null)
+            if (response.status === 429) {
                 throw new Error("Daily quota exceeded")
             }
             throw new Error(errorData?.detail || "An error occurred")
         }
 
-        return repsonse.json()
+        return response.json()
     }
 
     return {makeRequest}
