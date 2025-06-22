@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
+from typing import List, Literal
 
 from ..ai_generator import generate_challenge_with_ai
 from ..database.db import (
@@ -17,6 +18,50 @@ from datetime import datetime
 
 router = APIRouter()
 
+class TradeTransactionIn(BaseModel):
+    type: Literal["buy", "sell"]
+    date: datetime
+    amount: float
+    price: float
+
+class TradeCreateRequest(BaseModel):
+    ticker: str
+    notes: str = ""
+    transactions: List[TradeTransactionIn]
+
+@router.post("/trades")
+async def add_trade(request: TradeCreateRequest, request_obj: Request, db:Session = Depends(get_db)):
+    user_details = authenticate_and_get_user_details(request_obj)
+    user_id = user_details.get("user_id")
+
+    trade = create_trade(
+        db=db,
+        user_id = user_id,
+        ticker=request.ticker,
+        notes=request.notes,
+        transactions=[tx.dict() for tx in request.transactions]
+    )
+
+    return {"status": "success", "trade_id":trade.id}
+
+def summarise_trade(trade: models.Trade):
+    buys = [tx for tx in trade.transactions if tx.type = "buy"]
+    sells = [tx for tx in trade.transactions if tx.type = "sell"]
+
+    total_bought = sum(tx.amount for tx in buys)
+    total_sold = sum(tx.amount for tx in sells)
+
+    net_shares = total_bought - total_sold
+
+    if net_shares == 0:
+        buy_total = sum(tx.amount * tx.price for tx in buys)
+        sell_total = sum(tx.amount * tx.price for tx in sells)
+        pnl = sell_total - buy_total
+        return {"status": "Closed", "pnl": pnl}
+    else:
+        return {"status": "Open", "pnl": None}
+    
+###
 
 class ChallengeRequest(BaseModel):
     difficulty: str

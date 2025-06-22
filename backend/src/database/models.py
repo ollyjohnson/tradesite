@@ -1,11 +1,36 @@
-from sqlalchemy import Column, Integer, String, DateTime, create_engine
+from sqlalchemy import Column, Integer, String, DateTime, create_engine, Enum, Text, ForeignKey, Float
 from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.orm import sessionmaker, relationship
 from datetime import datetime
 
 engine = create_engine('sqlite:///database.db', echo=True)
 Base = declarative_base()
 
+class Trade(Base):
+    __tablename__ = 'trades'
+
+    id = Column(Integer, primary_key=True)
+    user_id = Column(String, nullable=False)
+    ticker = Column(String, nullable=False)
+    notes = Column(Text)
+
+    transactions = relationship("TradeTransaction", back_populate="trade", cascade="all, delete-orphan")
+
+class TradeTransaction(Base):
+    __tablename__ = 'trade_transactions'
+
+    id = Column(Integer, primary_key=True)
+    trade_id = Column(Integer, ForeignKey("trades.id"), nullable=False)
+    type = Column(Enum("buy", "sell", name="transation_type"), nullable=False)
+    date = Column(DateTime, nullable=False)
+    amount = Column(Float, nullable=False)
+    price = Column(Float, nullable=False)
+    commissions = Column(Float, nullable=False, default=0.00)
+
+    trade = relationship("Trade", back_populate="transactions")
+
+
+###
 
 class Challenge(Base):
     __tablename__ = 'challenges'
