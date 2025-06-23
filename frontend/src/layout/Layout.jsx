@@ -10,6 +10,8 @@ export function Layout() {
                 <nav>
                     <SignedIn>
                         <Link to="/">Generate Challenge</Link>
+                        <Link to="/log-trade">Log Trade</Link>
+                        <Link to="/my-trades">My Trades</Link>
                         <Link to="/history">History</Link>
                         <UserButton/>
                     </SignedIn>

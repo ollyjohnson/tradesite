@@ -66,7 +66,8 @@ def create_trade(db: Session, user_id: str,ticker:str, notes: str, transactions:
             type=tx["type"],
             date=tx["date"],
             amount=tx["amount"],
-            price=tx["price"]
+            price=tx["price"],
+            commissions=tx["commissions"]
         )
         db.add(transaction)
 

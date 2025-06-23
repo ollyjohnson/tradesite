@@ -5,6 +5,8 @@ from typing import List, Literal
 
 from ..ai_generator import generate_challenge_with_ai
 from ..database.db import (
+    get_trades_by_user,
+    create_trade,
     get_challenge_quota,
     create_challenge,
     create_challenge_quota,
@@ -23,9 +25,11 @@ class TradeTransactionIn(BaseModel):
     date: datetime
     amount: float
     price: float
+    commissions: float
 
 class TradeCreateRequest(BaseModel):
     ticker: str
+    mistake: str
     notes: str = ""
     transactions: List[TradeTransactionIn]
 
@@ -38,6 +42,7 @@ async def add_trade(request: TradeCreateRequest, request_obj: Request, db:Sessio
         db=db,
         user_id = user_id,
         ticker=request.ticker,
+        commissions=request.commissions,
         notes=request.notes,
         transactions=[tx.dict() for tx in request.transactions]
     )
@@ -56,11 +61,34 @@ def summarise_trade(trade: models.Trade):
     if net_shares == 0:
         buy_total = sum(tx.amount * tx.price for tx in buys)
         sell_total = sum(tx.amount * tx.price for tx in sells)
-        pnl = sell_total - buy_total
+        total_commissions = sum(tx.commissions for tx in trade.transactions)
+        pnl = sell_total - buy_total - total_commissions
         return {"status": "Closed", "pnl": pnl}
     else:
         return {"status": "Open", "pnl": None}
-    
+
+
+@router.get("/trades")
+async def get_trades(request: Request, db:Session = Depends(get_db)):
+    user_details = authenticate_and_get_user_details(request)
+    user_id = user_details.get("user_id")
+
+    trades = get_trades_by_user(db, user_id)
+
+    summarised = []
+    for trade in trades:
+        summary = summarise_trade(trade)
+        summarised.append({
+            "id": trade.id,
+            "ticker": trade.ticker,
+            "mistake": trade.mistake,
+            "notes": trade.notes,
+            "status": summary["status"],
+            "pnl": summary["pnl"]
+        })
+
+    return {"trades": summarised}
+
 ###
 
 class ChallengeRequest(BaseModel):
