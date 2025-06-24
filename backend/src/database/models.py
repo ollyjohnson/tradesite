@@ -15,7 +15,7 @@ class Trade(Base):
     mistake = Column(String, nullable=False, default="None")
     notes = Column(Text)
 
-    transactions = relationship("TradeTransaction", back_populate="trade", cascade="all, delete-orphan")
+    transactions = relationship("TradeTransaction", back_populates="trade", cascade="all, delete-orphan")
 
 class TradeTransaction(Base):
     __tablename__ = 'trade_transactions'
@@ -28,7 +28,7 @@ class TradeTransaction(Base):
     price = Column(Float, nullable=False)
     commissions = Column(Float, nullable=False, default=0.00)
 
-    trade = relationship("Trade", back_populate="transactions")
+    trade = relationship("Trade", back_populates="transactions")
 
 
 ###

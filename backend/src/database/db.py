@@ -1,5 +1,6 @@
 from sqlalchemy.orm import Session
 from datetime import datetime, timedelta
+from fastapi import HTTPException
 from . import models
 
 
@@ -55,8 +56,8 @@ def get_user_challenges(db: Session, user_id: str):
 
 ###
 
-def create_trade(db: Session, user_id: str,ticker:str, notes: str, transactions: list):
-    trade = models.Trade(user_id=user_id, ticker=ticker, notes=notes)
+def create_trade(db: Session, user_id: str,ticker:str, mistake:str,notes: str, transactions: list):
+    trade = models.Trade(user_id=user_id, ticker=ticker, mistake=mistake, notes=notes)
     db.add(trade)
     db.flush()
 
@@ -78,4 +79,30 @@ def create_trade(db: Session, user_id: str,ticker:str, notes: str, transactions:
 def get_trades_by_user(db:Session, user_id: str):
     return db.query(models.Trade).filter(models.Trade.user_id == user_id).all()
 
+def update_trade(db:Session, trade_id: int, user_id: str, data: dict):
+    trade = db.query(models.Trade).filter(models.Trade.id == trade_id, models.Trade.user_id == user_id).first()
+
+    if not trade:
+        raise HTTPException(status_code=404, detail="Trade not found")
+    
+    trade.ticker = data["ticker"]
+    trade.notes = data["notes"]
+    trade.mistake = data["mistake"]
+
+    db.query(models.TradeTransaction).filter(models.TradeTransaction.trade_id == trade_id).delete()
+
+    for tx in data["transactions"]:
+        transaction = models.TradeTransaction(
+            trade_id=trade_id,
+            type=tx["type"],
+            date=tx["date"],
+            amount=tx["amount"],
+            price=tx["price"],
+            commissions=tx["commissions"]
+        )
+        db.add(transaction)
+
+    db.commit()
+    db.refresh(trade)
+    return trade
 

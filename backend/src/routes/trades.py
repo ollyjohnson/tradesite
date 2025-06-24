@@ -7,6 +7,7 @@ from ..ai_generator import generate_challenge_with_ai
 from ..database.db import (
     get_trades_by_user,
     create_trade,
+    update_trade,
     get_challenge_quota,
     create_challenge,
     create_challenge_quota,
@@ -15,6 +16,7 @@ from ..database.db import (
 )
 from ..utils import authenticate_and_get_user_details
 from ..database.models import get_db
+from ..database import models
 import json
 from datetime import datetime
 
@@ -42,16 +44,34 @@ async def add_trade(request: TradeCreateRequest, request_obj: Request, db:Sessio
         db=db,
         user_id = user_id,
         ticker=request.ticker,
-        commissions=request.commissions,
+        mistake=request.mistake,
         notes=request.notes,
         transactions=[tx.dict() for tx in request.transactions]
     )
 
     return {"status": "success", "trade_id":trade.id}
 
+@router.post("/trades/{trade_id}")
+async def edit_trade(trade_id: int ,request: TradeCreateRequest, request_obj: Request, db:Session = Depends(get_db)):
+    user_details = authenticate_and_get_user_details(request_obj)
+    user_id = user_details.get("user_id")
+
+    updated = update_trade(
+        db=db,
+        user_id = user_id,
+        data={
+            "ticker"=request.ticker,
+            "mistake"=request.mistake,
+            "notes"=request.notes,
+            "transactions"=[tx.dict() for tx in request.transactions]
+        }
+    )
+
+    return {"status": "updated", "trade_id":updated.id}
+
 def summarise_trade(trade: models.Trade):
-    buys = [tx for tx in trade.transactions if tx.type = "buy"]
-    sells = [tx for tx in trade.transactions if tx.type = "sell"]
+    buys = [tx for tx in trade.transactions if tx.type == "buy"]
+    sells = [tx for tx in trade.transactions if tx.type == "sell"]
 
     total_bought = sum(tx.amount for tx in buys)
     total_sold = sum(tx.amount for tx in sells)

@@ -1,5 +1,8 @@
 import { useEffect, useState } from "react"
 import { useApi } from "../utils/api"
+import { useNavigate } from "react-router-dom"
+
+const navigate = useNavigate()
 
 export function TradeList() {
     const { makeRequest } = useApi()
@@ -25,7 +28,7 @@ export function TradeList() {
     const formatPnl = (pnl, status) => {
         if (status == "Open") return <span style={{color: "black"}} > Open </span>
         if (pnl > 0) return <span style={{color: "green"}} > +{pnl.toFixed(2)}</span>
-        if (pnl < 0) return <span style={{color: "red"}} > -{pnl.toFixed(2)}</span>
+        if (pnl < 0) return <span style={{color: "red"}} > {pnl.toFixed(2)}</span>
         return <span style={{color: "black" }}>0.00</span>
     }
 
@@ -40,12 +43,13 @@ export function TradeList() {
             ) : (
                 <div className="history-list">
                     {trades.map((trade) => (
-                        <div className="history-item" key={trades.id}>
-                            <strong>{trades.ticker}</strong><br />
-                            <em>{trades.notes}</em>
-                            <em>{trades.notes}</em>
-                            <p>Status: {trades.status}</p>
-                            <p>Profit/Loss: {formatPnl(trades.pnl, trades.status)}</p>
+                        <div className="history-item" key={trade.id}>
+                            <strong>{trade.ticker}</strong><br />
+                            <p>{trade.mistake}</p>
+                            <em>{trade.notes}</em>
+                            <p>Status: {trade.status}</p>
+                            <p>Profit/Loss: {formatPnl(trade.pnl, trade.status)}</p>
+                            <button onClick={() => navigate(`/edit-trade/${trade.id}`)}>Edit</button>
                         </div>
                     ))}
                 </div>
