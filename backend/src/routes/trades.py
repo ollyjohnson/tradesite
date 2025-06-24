@@ -51,19 +51,20 @@ async def add_trade(request: TradeCreateRequest, request_obj: Request, db:Sessio
 
     return {"status": "success", "trade_id":trade.id}
 
-@router.post("/trades/{trade_id}")
+@router.put("/trades/{trade_id}")
 async def edit_trade(trade_id: int ,request: TradeCreateRequest, request_obj: Request, db:Session = Depends(get_db)):
     user_details = authenticate_and_get_user_details(request_obj)
     user_id = user_details.get("user_id")
 
     updated = update_trade(
         db=db,
+        trade_id=trade_id,
         user_id = user_id,
         data={
-            "ticker"=request.ticker,
-            "mistake"=request.mistake,
-            "notes"=request.notes,
-            "transactions"=[tx.dict() for tx in request.transactions]
+            "ticker": request.ticker,
+            "mistake": request.mistake,
+            "notes": request.notes,
+            "transactions": [tx.dict() for tx in request.transactions]
         }
     )
 
@@ -108,6 +109,35 @@ async def get_trades(request: Request, db:Session = Depends(get_db)):
         })
 
     return {"trades": summarised}
+
+@router.get("/trades/{trade_id}")
+async def get_trade(trade_id: int, request: Request, db:Session = Depends(get_db)):
+    user_details = authenticate_and_get_user_details(request)
+    user_id = user_details.get("user_id")
+
+    trade = db.query(models.Trade).filter_by(id=trade_id, user_id=user_id).first()
+
+    if not trade:
+        raise HTTPException(status_code=404, detail="Trade not found")
+    
+    return {
+        "trade": {
+            "id": trade.id,
+            "ticker": trade.ticker,
+            "notes": trade.notes,
+            "mistake": trade.mistake,
+            "transactions": [
+                {
+                    "type": tx.type,
+                    "date": tx.date.isoformat(),
+                    "amount": tx.amount,
+                    "price": tx.price,
+                    "commissions": tx.commissions
+                }
+                for tx in trade.transactions
+            ]
+        }
+    }
 
 ###
 

@@ -1,91 +1,51 @@
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useApi } from "../utils/api"
+import { useNavigate , useParams}  from "react-router-dom"
+import { TradeForm } from "./TradeForm"
 
-export function TradeForm() {
+export function EditTradeForm() {
   const { makeRequest } = useApi()
-  const [ticker, setTicker] = useState("")
-  const [mistake, setMistake] = useState("")
-  const [notes, setNotes] = useState("")
-  const [buys, setBuys] = useState([{ date: "", amount: "", price: "", commissions: ""}])
-  const [sells, setSells] = useState([{ date: "", amount: "", price: "", commissions: ""}])
-  const [message, setMessage] = useState(null)
+  const navigate = useNavigate()
+  const { tradeId } = useParams()
 
-  const handleAddRow = (setList, list) => {
-    setList([...list, { date: "", amount: "", price: "", commissions: ""}])
-  }
+  const [initialData, setInitialData] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
 
-  const handleChange = (list, setList, index, field, value) => {
-    const updated = [...list]
-    updated[index][field] = value
-    setList(updated)
-  }
+  useEffect(() => {
+    fetchTrade()
+  }, [])
 
-  const handleSubmit = async (e) => {
-    e.preventDefault()
-
-    const transactions = [
-      ...buys.map(tx => ({ ...tx, type: "buy" })),
-      ...sells.map(tx => ({ ...tx, type: "sell" }))
-    ].map(tx => ({
-      ...tx,
-      amount: parseFloat(tx.amount),
-      price: parseFloat(tx.price),
-      date: new Date(tx.date).toISOString(),
-      commissions: parseFloat(tx.commissions)
-    }))
-
+  const fetchTrade = async () => {
     try {
-      await makeRequest("trades", {
-        method: "POST",
-        body: JSON.stringify({ ticker, mistake, notes, transactions })
-      })
-      setMessage("Trade successfully logged!")
+      const data = await makeRequest(`trades/${tradeId}`)
+      setInitialData(data.trade)
     } catch (err) {
-      setMessage("Error: " + err.message)
+      setError("Failed to load trade.")
+    } finally {
+      setLoading(false)
     }
   }
+  
+    const handleSubmit = async (formData) => {
+      try {
+        await makeRequest(`trades/${tradeId}`, {
+          method: "PUT",
+          body: JSON.stringify(formData),
+        })
+        navigate("/my-trades")
+      } catch (err){
+        console.error("Failed to update trade:", err)
+      }
+    }
+
+  if (loading) return <p className="text-white text-center mt-8">Loading trade data...</p>
+  if (error) return <p className="text-red-400 text-center mt-8">{error}</p>
 
   return (
-    <div className="challenge-container">
-      <h2>Log a Trade</h2>
-      <form onSubmit={handleSubmit}>
-        <label>Ticker Symbol</label>
-        <input value={ticker} onChange={e => setTicker(e.target.value)} required />
-
-        <label>Mistake</label>
-        <input value={mistake} onChange={e => setMistake(e.target.value)} required />
-
-        <label>Notes</label>
-        <textarea value={notes} onChange={e => setNotes(e.target.value)} />
-
-        <h3>Buy Transactions</h3>
-        {buys.map((buy, i) => (
-          <div key={i}>
-            <input type="date" value={buy.date} onChange={e => handleChange(buys, setBuys, i, "date", e.target.value)} required />
-            <input type="number" value={buy.amount} placeholder="Shares" onChange={e => handleChange(buys, setBuys, i, "amount", e.target.value)} required />
-            <input type="number" value={buy.price} placeholder="Price" onChange={e => handleChange(buys, setBuys, i, "price", e.target.value)} required />
-            <input type="number" value={buy.commissions} placeholder="Commissions" onChange={e => handleChange(buys, setBuys, i, "commissions", e.target.value)} required />
-          </div>
-        ))}
-        <button type="button" onClick={() => handleAddRow(setBuys, buys)}>Add Buy</button>
-
-        <h3>Sell Transactions</h3>
-        {sells.map((sell, i) => (
-          <div key={i}>
-            <input type="date" value={sell.date} onChange={e => handleChange(sells, setSells, i, "date", e.target.value)} />
-            <input type="number" value={sell.amount} placeholder="Shares" onChange={e => handleChange(sells, setSells, i, "amount", e.target.value)} />
-            <input type="number" value={sell.price} placeholder="Price" onChange={e => handleChange(sells, setSells, i, "price", e.target.value)} />
-            <input type="number" value={sell.commissions} placeholder="Commissions" onChange={e => handleChange(sells, setSells, i, "commissions", e.target.value)} required />
-          </div>
-        ))}
-
-        <button type="button" onClick={() => handleAddRow(setSells, sells)}>Add Sell</button>
-
-        <br /><br />
-        <button type="submit" className="generate-button">Submit Trade</button>
-      </form>
-
-      {message && <div className="quota-display"><p>{message}</p></div>}
+    <div className="max-w-4xl mx-auto mt-10 p-6 bg-white/5 backdrop-blur-lg shadow-lg rounded-xl text-white">
+      <h2 className="text-2xl font-semibold text-pink-400 mb-6">Edit Trade</h2>
+      <TradeForm initialData={initialData} onSubmit={handleSubmit} />
     </div>
   )
 }
