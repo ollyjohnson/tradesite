@@ -43,26 +43,34 @@ export function TradeList() {
         <p className="text-white/80">No trades yet.</p>
       ) : (
         <div className="history-list">
+          <div className="flex text-white font-semibold border-b border-white/10 pb-2 mb-2">
+            <div className="w-1/6">Ticker</div>
+            <div className="w-1/6">Type</div>
+            <div className="w-1/6">Open Date</div>
+            <div className="w-1/6">Close Date</div>
+            <div className="w-1/6">Mistake</div>
+            <div className="w-1/6">PnL</div>
+          </div>
+
           {trades.map((trade) => (
             <div
-              className="history-item flex flex-col gap-2"
               key={trade.id}
+              className="flex text-white/80 items-center border-b border-white/10 py-3 hover:bg-white/5 transition"
             >
-              <strong className="text-white text-lg font-bold">
-                {trade.ticker}
-              </strong>
-              <p className="text-white/80">{trade.mistake}</p>
-              <em className="text-white/80 italic">{trade.notes}</em>
-              <p className="text-white/80">Status: {trade.status}</p>
-              <p className="text-white/80">
-                Profit/Loss: {formatPnl(trade.pnl, trade.status)}
-              </p>
-              <button
-                className="self-start mt-2 bg-pink-600 hover:bg-pink-500 text-white px-3 py-1 rounded-md text-sm shadow"
-                onClick={() => navigate(`/edit-trade/${trade.id}`)}
-              >
-                Edit
-              </button>
+              <div className="w-1/6 font-bold">{trade.ticker}</div>
+              <div className="w-1/6">{trade.trade_type}</div>
+              <div className="w-1/6">
+                {trade.earliest_transaction
+                  ? new Date(trade.earliest_transaction).toLocaleDateString()
+                  : "N/A"}
+              </div>
+              <div className="w-1/6">
+                {trade.status === "Closed" && trade.latest_transaction
+                  ? new Date(trade.latest_transaction).toLocaleDateString()
+                  : "Open"}
+              </div>
+              <div className="w-1/6">{trade.mistake}</div>
+              <div className="w-1/6">{formatPnl(trade.pnl, trade.status)}</div>
             </div>
           ))}
         </div>

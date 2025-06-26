@@ -16,6 +16,7 @@ function App() {
                 <Route path="/" element={<TradeList />}/>
                 <Route path="/log-trade" element={<TradeForm />}/>
                 <Route path="/my-trades" element={<TradeList />} />
+                <Route path="/trade/:id" element={<TradeDetail />} />
                 <Route path="/edit-trade/:tradeId" element={<EditTradeForm />} />
             </Route>
         </Routes>

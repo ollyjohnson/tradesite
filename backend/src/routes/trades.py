@@ -103,6 +103,9 @@ async def get_trades(request: Request, db:Session = Depends(get_db)):
             "id": trade.id,
             "ticker": trade.ticker,
             "mistake": trade.mistake,
+            "trade_type": trade.trade_type,
+            "earliest_transaction": trade.earliest_transaction,
+            "latest_transaction": trade.latest_transaction,
             "notes": trade.notes,
             "status": summary["status"],
             "pnl": summary["pnl"]

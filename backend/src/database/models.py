@@ -12,8 +12,11 @@ class Trade(Base):
     id = Column(Integer, primary_key=True)
     user_id = Column(String, nullable=False)
     ticker = Column(String, nullable=False)
+    trade_type = Column(String, nullable=True)
     mistake = Column(String, nullable=False, default="None")
     notes = Column(Text)
+    latest_transaction = Column(DateTime, nullable=True)
+    earliest_transaction = Column(DateTime, nullable=True)
 
     transactions = relationship("TradeTransaction", back_populates="trade", cascade="all, delete-orphan")
 

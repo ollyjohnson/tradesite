@@ -1,4 +1,5 @@
 from sqlalchemy.orm import Session
+from sqlalchemy import desc, nullsfirst
 from datetime import datetime, timedelta
 from fastapi import HTTPException
 from . import models
@@ -57,6 +58,9 @@ def get_user_challenges(db: Session, user_id: str):
 ###
 
 def create_trade(db: Session, user_id: str,ticker:str, mistake:str,notes: str, transactions: list):
+    latest_transaction = None
+    earliest_transaction = None
+    trade_type = "Long"
     trade = models.Trade(user_id=user_id, ticker=ticker, mistake=mistake, notes=notes)
     db.add(trade)
     db.flush()
@@ -70,14 +74,28 @@ def create_trade(db: Session, user_id: str,ticker:str, mistake:str,notes: str, t
             price=tx["price"],
             commissions=tx["commissions"]
         )
+        date = tx["date"]
+        if latest_transaction is None or date > latest_transaction:
+            latest_transaction = date
+        if earliest_transaction is None or date < earliest_transaction:
+            earliest_transaction = date
+            if tx["type"] == "buy":
+                trade_type = "Long"
+            else:
+                trade_type = "Short"
+
         db.add(transaction)
+
+    trade.latest_transaction = latest_transaction
+    trade.earliest_transaction = earliest_transaction
+    trade.trade_type = trade_type
 
     db.commit()
     db.refresh(trade)
     return trade
 
 def get_trades_by_user(db:Session, user_id: str):
-    return db.query(models.Trade).filter(models.Trade.user_id == user_id).all()
+    return db.query(models.Trade).filter(models.Trade.user_id == user_id).order_by(nullsfirst(desc(models.Trade.latest_transaction))).all()
 
 def update_trade(db:Session, trade_id: int, user_id: str, data: dict):
     trade = db.query(models.Trade).filter(models.Trade.id == trade_id, models.Trade.user_id == user_id).first()
@@ -88,6 +106,9 @@ def update_trade(db:Session, trade_id: int, user_id: str, data: dict):
     trade.ticker = data["ticker"]
     trade.notes = data["notes"]
     trade.mistake = data["mistake"]
+    earliest_transaction = trade.earliest_transaction
+    latest_transaction = trade.latest_transaction
+    trade_type = trade.trade_type
 
     db.query(models.TradeTransaction).filter(models.TradeTransaction.trade_id == trade_id).delete()
 
@@ -100,7 +121,21 @@ def update_trade(db:Session, trade_id: int, user_id: str, data: dict):
             price=tx["price"],
             commissions=tx["commissions"]
         )
+        date = tx["date"]
+        if latest_transaction is None or date > latest_transaction:
+            latest_transaction = date
+        if earliest_transaction is None or date < earliest_transaction:
+            earliest_transaction = date
+            if tx["type"] == "buy":
+                trade_type = "Long"
+            else:
+                trade_type = "Short"
+
         db.add(transaction)
+
+    trade.latest_transaction = latest_transaction
+    trade.earliest_transaction = earliest_transaction
+    trade.trade_type = trade_type
 
     db.commit()
     db.refresh(trade)
