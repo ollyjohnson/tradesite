@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from .routes import trades, webhooks
+from .routes import trades, webhooks, alpha
 
 app = FastAPI()
 
@@ -15,3 +15,4 @@ app.add_middleware(
 
 app.include_router(trades.router, prefix="/api")
 app.include_router(webhooks.router, prefix="/webhooks")
+app.include_router(alpha.router, prefix="/api")

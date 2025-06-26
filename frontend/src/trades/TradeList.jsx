@@ -56,6 +56,7 @@ export function TradeList() {
             <div
               key={trade.id}
               className="flex text-white/80 items-center border-b border-white/10 py-3 hover:bg-white/5 transition"
+              onClick={() => navigate(`/trade/${trade.id}`)}
             >
               <div className="w-1/6 font-bold">{trade.ticker}</div>
               <div className="w-1/6">{trade.trade_type}</div>

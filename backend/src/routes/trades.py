@@ -119,6 +119,7 @@ async def get_trade(trade_id: int, request: Request, db:Session = Depends(get_db
     user_id = user_details.get("user_id")
 
     trade = db.query(models.Trade).filter_by(id=trade_id, user_id=user_id).first()
+    summary = summarise_trade(trade)
 
     if not trade:
         raise HTTPException(status_code=404, detail="Trade not found")
@@ -127,20 +128,27 @@ async def get_trade(trade_id: int, request: Request, db:Session = Depends(get_db
         "trade": {
             "id": trade.id,
             "ticker": trade.ticker,
-            "notes": trade.notes,
+            "status": summary["status"],
+            "pnl": summary["pnl"],
             "mistake": trade.mistake,
+            "notes": trade.notes,
+            "trade_type": trade.trade_type,
+            "earliest_transaction": trade.earliest_transaction,
+            "latest_transaction": trade.latest_transaction,
             "transactions": [
                 {
                     "type": tx.type,
-                    "date": tx.date.isoformat(),
                     "amount": tx.amount,
                     "price": tx.price,
-                    "commissions": tx.commissions
+                    "commissions": tx.commissions,
+                    "date": tx.date,
                 }
                 for tx in trade.transactions
             ]
         }
     }
+
+
 
 ###
 

@@ -5,6 +5,7 @@ import {AuthenticationPage} from "./auth/AuthenticationPage.jsx"
 import {TradeForm} from "./trades/TradeForm.jsx"
 import { TradeList } from "./trades/TradeList.jsx"
 import {EditTradeForm} from "./trades/EditTradeForm"
+import {TradeDetail} from "./trades/TradeDetail.jsx"
 import './App.css'
 
 function App() {
