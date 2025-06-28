@@ -50,42 +50,65 @@ export function TradeList() {
             <div className="w-1/6">Close Date</div>
             <div className="w-1/6">Mistake</div>
             <div className="w-1/6">PnL</div>
+            <div className="w-[300px]"></div>
           </div>
 
           {trades.map((trade) => (
-            <div
-            key={trade.id}
-            className="flex text-white/80 items-center border-b border-white/10 py-3 hover:bg-white/5 transition"
-            onClick={() => navigate(`/trade/${trade.id}`)}
-          >
-            <div className="w-1/6 font-bold">{trade.ticker}</div>
-            <div className="w-1/6">{trade.trade_type}</div>
-            <div className="w-1/6">
-              {trade.earliest_transaction
-                ? new Date(trade.earliest_transaction).toLocaleDateString()
-                : "N/A"}
-            </div>
-            <div className="w-1/6">
-              {trade.status === "Closed" && trade.latest_transaction
-                ? new Date(trade.latest_transaction).toLocaleDateString()
-                : "Open"}
-            </div>
-            <div className="w-1/6">{trade.mistake}</div>
-            <div className="w-1/6">{formatPnl(trade.pnl, trade.status)}</div>
-
-            {/* 👇 Edit Button */}
-            <div className="ml-4">
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  navigate(`/edit-trade/${trade.id}`);
-                }}
-                className="bg-pink-500 text-white px-3 py-1 rounded hover:bg-pink-600 transition"
+            <div className="relative -mx-2 px-2 rounded-md hover:bg-white/5 transition">
+              <div
+                key={trade.id}
+                className="flex text-white/80 items-center py-3"
+                onClick={() => navigate(`/trade/${trade.id}`)}
               >
-                Edit
-              </button>
+                <div className="w-1/6 font-bold">{trade.ticker}</div>
+                <div className="w-1/6">{trade.trade_type}</div>
+                <div className="w-1/6">
+                  {trade.earliest_transaction
+                    ? new Date(trade.earliest_transaction).toLocaleDateString()
+                    : "N/A"}
+                </div>
+                <div className="w-1/6">
+                  {trade.status === "Closed" && trade.latest_transaction
+                    ? new Date(trade.latest_transaction).toLocaleDateString()
+                    : "Open"}
+                </div>
+                <div className="w-1/6">{trade.mistake}</div>
+                <div className="w-1/6">{formatPnl(trade.pnl, trade.status)}</div>
+                <div className="ml-4">
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      navigate(`/edit-trade/${trade.id}`)
+                    }}
+                    className="bg-pink-500 text-white bg-opacity-50 px-3 py-1 rounded hover:bg-pink-600 transition"
+                  >
+                    Edit
+                  </button>
+                </div>
+                <div className="ml-4">
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      navigate(`/trade/${trade.id}`)
+                    }}
+                    className="bg-pink-500 text-white bg-opacity-50 px-3 py-1 rounded hover:bg-pink-600 transition"
+                  >
+                    Details
+                  </button>
+                </div>
+                <div className="ml-4">
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      navigate(`/delete/${trade.id}`)
+                    }}
+                    className="bg-pink-500 bg-opacity-50 text-white px-3 py-1 rounded hover:bg-pink-600 transition"
+                  >
+                  🗑️
+                  </button>
+                </div>
+              </div>
             </div>
-          </div>
           ))}
         </div>
       )}

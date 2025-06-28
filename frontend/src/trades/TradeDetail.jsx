@@ -40,15 +40,33 @@ export function TradeDetail() {
     <div className="p-6 max-w-3xl mx-auto text-white">
       <h1 className="text-2xl font-bold mb-4">{trade.ticker} Trade Details</h1>
 
-      <div className="mb-6">
-        <p><strong>Status:</strong> {trade.status}</p>
-        <p><strong>Mistake:</strong> {trade.mistake}</p>
-        <p><strong>Notes:</strong> {trade.notes || "None"}</p>
-        <p><strong>Type:</strong> {trade.trade_type}</p>
-        <p><strong>Date Range:</strong> {trade.earliest_transaction && new Date(trade.earliest_transaction).toLocaleDateString()} to {trade.latest_transaction && new Date(trade.latest_transaction).toLocaleDateString()}</p>
-        <p><strong>PnL:</strong> {formatPnl(trade.pnl, trade.status)}</p>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div>
+          <span className="font-semibold text-white">Type: </span> {trade.trade_type}
+        </div>
+        <div>
+          <span className="font-semibold text-white">Mistake: </span> {trade.mistake}
+        </div>
+        <div className="sm:col-span-2">
+          <span className="font-semibold text-white block mb-1">Notes: </span>
+          <p className="text-white/80">{trade.notes}</p>
+        </div>
+        <div>
+          <span className="font-semibold text-white">Status: </span> {trade.status}
+        </div>
+        <div>
+          <span className="font-semibold text-white">Date Range: </span>{" "}
+          {new Date(trade.earliest_transaction).toLocaleDateString()} to{" "}
+          {new Date(trade.latest_transaction).toLocaleDateString()}
+        </div>
+        <div className="sm:col-span-2">
+          <span className="font-semibold text-white">PnL: </span>{" "}
+          <span className="text-green-400 font-medium">
+            +{trade.pnl.toFixed(2)}
+          </span>
+        </div>
       </div>
-
+      <br></br>
       <div className="mb-8">
         <h2 className="text-xl font-semibold mb-2">Price Chart</h2>
         <TradeChart

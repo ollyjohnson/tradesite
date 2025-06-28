@@ -3,6 +3,7 @@ from sqlalchemy import desc, nullsfirst
 from datetime import datetime, timedelta
 from fastapi import HTTPException
 from . import models
+from zoneinfo import ZoneInfo
 
 
 def get_challenge_quota(db: Session, user_id: str):
@@ -56,7 +57,20 @@ def get_user_challenges(db: Session, user_id: str):
     return db.query(models.Challenge).filter(models.Challenge.created_by == user_id).all()
 
 ###
-
+def parse_datetime_to_utc(dt_input):
+    UTC = ZoneInfo("UTC")
+    if isinstance(dt_input, datetime):
+        if dt_input.tzinfo is None:
+            dt_input = dt_input.replace(tzinfo=UTC)
+        return dt_input.astimezone(UTC)
+    elif isinstance(dt_input, str):
+        dt = datetime.fromisoformat(dt_input)
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=UTC)
+        return dt.astimezone(UTC)
+    else:
+        raise TypeError("Unsupported datetime input")
+    
 def create_trade(db: Session, user_id: str,ticker:str, mistake:str,notes: str, transactions: list):
     latest_transaction = None
     earliest_transaction = None
@@ -66,19 +80,15 @@ def create_trade(db: Session, user_id: str,ticker:str, mistake:str,notes: str, t
     db.flush()
 
     for tx in transactions:
-        date = tx["date"]
-        if date.tzinfo is not None:
-            date = date.replace(tzinfo=None)
-
+        date = parse_datetime_to_utc(tx["date"])
         transaction = models.TradeTransaction(
-            trade_id=trade_id,
+            trade_id=trade.id,
             type=tx["type"],
             date=date,
             amount=tx["amount"],
             price=tx["price"],
             commissions=tx["commissions"]
         )
-
         if latest_transaction is None or date > latest_transaction:
             latest_transaction = date
         if earliest_transaction is None or date < earliest_transaction:
@@ -110,16 +120,12 @@ def update_trade(db:Session, trade_id: int, user_id: str, data: dict):
     trade.ticker = data["ticker"]
     trade.notes = data["notes"]
     trade.mistake = data["mistake"]
-    earliest_transaction = trade.earliest_transaction
-    latest_transaction = trade.latest_transaction
-    trade_type = trade.trade_type
-
     db.query(models.TradeTransaction).filter(models.TradeTransaction.trade_id == trade_id).delete()
 
+    parsed_transactions = []
     for tx in data["transactions"]:
-        date = tx["date"]
-        if date.tzinfo is not None:
-            date = date.replace(tzinfo=None)
+        date = parse_datetime_to_utc(tx["date"])
+        parsed_transactions.append((date, tx["type"]))
 
         transaction = models.TradeTransaction(
             trade_id=trade_id,
@@ -129,21 +135,19 @@ def update_trade(db:Session, trade_id: int, user_id: str, data: dict):
             price=tx["price"],
             commissions=tx["commissions"]
         )
-        date = tx["date"]
-        if latest_transaction is None or date > latest_transaction:
-            latest_transaction = date
-        if earliest_transaction is None or date < earliest_transaction:
-            earliest_transaction = date
-            if tx["type"] == "buy":
-                trade_type = "Long"
-            else:
-                trade_type = "Short"
-
         db.add(transaction)
 
-    trade.latest_transaction = latest_transaction
+    dates = [dt for dt, _ in parsed_transactions]
+    types = {dt: t for dt, t in parsed_transactions}
+    earliest_transaction = min(dates)
+    latest_transaction = max(dates)
+
+    trade_type = "Long" if types[earliest_transaction] == "buy" else "Short"
+
     trade.earliest_transaction = earliest_transaction
+    trade.latest_transaction = latest_transaction
     trade.trade_type = trade_type
+
 
     db.commit()
     db.refresh(trade)

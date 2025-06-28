@@ -4,24 +4,28 @@ import { useEffect, useRef } from 'react'
 export function TradeChart() {
   const chartContainerRef = useRef(null)
 
-  useEffect(() => {
-    if (!chartContainerRef.current) return
+useEffect(() => {
+  if (!chartContainerRef.current) return
 
-    const chart = createChart(chartContainerRef.current, {
-      width: 600,
-      height: 300,
-      layout: {
-        textColor: '#000',
-        background: { type: 'solid', color: '#fff' },
-      },
-    })
+  const container = chartContainerRef.current
+  const chart = createChart(container, {
+    width: container.clientWidth,
+    height: 300,
+    layout: {
+      textColor: '#000',
+      background: { type: 'solid', color: '#fff' },
+    },
+  })
 
-    const candlestickSeries = chart.addSeries(CandlestickSeries, {
-    upColor: '#26a69a', downColor: '#ef5350', borderVisible: false,
-    wickUpColor: '#26a69a', wickDownColor: '#ef5350',
-    });
+  const candlestickSeries = chart.addSeries(CandlestickSeries, {
+    upColor: '#26a69a',
+    downColor: '#ef5350',
+    borderVisible: false,
+    wickUpColor: '#26a69a',
+    wickDownColor: '#ef5350',
+  })
 
-    const hardcodedData = [
+  const hardcodedData = [
       { time: '2018-12-22', open: 75.16, high: 82.84, low: 36.16, close: 45.72 },
       { time: '2018-12-23', open: 45.12, high: 53.90, low: 45.12, close: 48.09 },
       { time: '2018-12-24', open: 60.71, high: 60.71, low: 53.39, close: 59.29 },
@@ -34,9 +38,9 @@ export function TradeChart() {
       { time: '2018-12-31', open: 109.87, high: 114.69, low: 85.66, close: 111.26 },
     ]
 
-    candlestickSeries.setData(hardcodedData)
+  candlestickSeries.setData(hardcodedData)
 
-    const markers = [
+  const markers = [
       {
         time: '2018-12-25',
         position: 'belowBar',
@@ -53,13 +57,21 @@ export function TradeChart() {
       },
     ]
 
-    createSeriesMarkers(candlestickSeries, markers)
-    chart.timeScale().fitContent()
+  createSeriesMarkers(candlestickSeries, markers)
+  chart.timeScale().fitContent()
 
-    return () => {
-      chart.remove()
-    }
-  }, [])
+  const handleResize = () => {
+    chart.applyOptions({ width: container.clientWidth })
+  }
 
-  return <div ref={chartContainerRef} style={{ width: '100%', height: 400 }} />
+  window.addEventListener('resize', handleResize)
+
+  return () => {
+    window.removeEventListener('resize', handleResize)
+    chart.remove()
+  }
+}, [])
+
+
+  return <div ref={chartContainerRef} style={{ width: '100%', height: 300 }} />
 }
