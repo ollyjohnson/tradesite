@@ -66,15 +66,19 @@ def create_trade(db: Session, user_id: str,ticker:str, mistake:str,notes: str, t
     db.flush()
 
     for tx in transactions:
+        date = tx["date"]
+        if date.tzinfo is not None:
+            date = date.replace(tzinfo=None)
+
         transaction = models.TradeTransaction(
-            trade_id=trade.id,
+            trade_id=trade_id,
             type=tx["type"],
-            date=tx["date"],
+            date=date,
             amount=tx["amount"],
             price=tx["price"],
             commissions=tx["commissions"]
         )
-        date = tx["date"]
+
         if latest_transaction is None or date > latest_transaction:
             latest_transaction = date
         if earliest_transaction is None or date < earliest_transaction:
@@ -113,10 +117,14 @@ def update_trade(db:Session, trade_id: int, user_id: str, data: dict):
     db.query(models.TradeTransaction).filter(models.TradeTransaction.trade_id == trade_id).delete()
 
     for tx in data["transactions"]:
+        date = tx["date"]
+        if date.tzinfo is not None:
+            date = date.replace(tzinfo=None)
+
         transaction = models.TradeTransaction(
             trade_id=trade_id,
             type=tx["type"],
-            date=tx["date"],
+            date=date,
             amount=tx["amount"],
             price=tx["price"],
             commissions=tx["commissions"]
