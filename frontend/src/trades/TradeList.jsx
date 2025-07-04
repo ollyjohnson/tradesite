@@ -54,9 +54,10 @@ export function TradeList() {
           </div>
 
           {trades.map((trade) => (
-            <div className="relative -mx-2 px-2 rounded-md hover:bg-white/5 transition">
+            <div
+              key={trade.id}
+              className="relative -mx-2 px-2 rounded-md hover:bg-white/5 transition">
               <div
-                key={trade.id}
                 className="flex text-white/80 items-center py-3"
                 onClick={() => navigate(`/trade/${trade.id}`)}
               >
@@ -98,9 +99,17 @@ export function TradeList() {
                 </div>
                 <div className="ml-4">
                   <button
-                    onClick={(e) => {
+                    onClick={async (e) => {
                       e.stopPropagation()
-                      navigate(`/delete/${trade.id}`)
+                      const confirmed = window.confirm("Are you sure want to delete this trade?")
+                      if (!confirmed) return
+                      try {
+                        await makeRequest(`trades/${trade.id}`, "DELETE")
+                        await fetchTrades()
+                      } catch (err) {
+                        console.errror("Failed to delete trade", err)
+                        alert("Failed to delete trade. Please try agian.")
+                      }
                     }}
                     className="bg-pink-500 bg-opacity-50 text-white px-3 py-1 rounded hover:bg-pink-600 transition"
                   >

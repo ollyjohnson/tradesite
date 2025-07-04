@@ -24,7 +24,7 @@ class TradeTransaction(Base):
     __tablename__ = 'trade_transactions'
 
     id = Column(Integer, primary_key=True)
-    trade_id = Column(Integer, ForeignKey("trades.id"), nullable=False)
+    trade_id = Column(Integer, ForeignKey("trades.id",  ondelete="CASCADE"), nullable=False)
     type = Column(Enum("buy", "sell", name="transation_type"), nullable=False)
     date = Column(DateTime, nullable=False)
     amount = Column(Float, nullable=False)

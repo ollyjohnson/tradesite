@@ -148,6 +148,24 @@ async def get_trade(trade_id: int, request: Request, db:Session = Depends(get_db
         }
     }
 
+@router.delete("/trades/{trade_id}")
+async def delete_trade(trade_id: int, request: Request, db:Session = Depends(get_db)):
+    user_details = authenticate_and_get_user_details(request)
+    user_id = user_details.get("user_id")
+
+    trade = db.query(models.Trade).filter(models.Trade.id == trade_id, models.Trade.user_id == user_id).first()
+    if not trade:
+        raise HTTPException(status_code=404, detail="Trade not found")
+    
+    try:
+        db.delete(trade)
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        print("DELETE FAILED:", e)
+        raise HTTPException(status_code=500, detail="Deletion failed")
+    return {"message": "Trade deleted"}
+
 
 
 ###
