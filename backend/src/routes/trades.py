@@ -1,9 +1,9 @@
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile, File
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from typing import List, Literal
 
-from ..ai_generator import generate_challenge_with_ai
+from ..ai_generator import parse_trades_from_csv_with_ai
 from ..database.db import (
     get_trades_by_user,
     create_trade,
@@ -166,82 +166,70 @@ async def delete_trade(trade_id: int, request: Request, db:Session = Depends(get
         raise HTTPException(status_code=500, detail="Deletion failed")
     return {"message": "Trade deleted"}
 
+@router.post("/trades/import-csv")
+async def import_trades_from_csv(
+    request: Request,
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+):
+    """
+    Upload a CSV of executions, let AI turn it into trades,
+    then insert those trades into the database for the current user.
+    """
+    user_details = authenticate_and_get_user_details(request)
+    user_id = user_details.get("user_id")
 
+    # Read the uploaded file into text
+    content_bytes = await file.read()
+    csv_text = content_bytes.decode("utf-8", errors="ignore")
 
-###
-
-class ChallengeRequest(BaseModel):
-    difficulty: str
-
-    class Config:
-        json_schema_extra = {"example": {"difficulty": "easy"}}
-
-
-@router.post("/generate-challenge")
-async def generate_challenge(request: ChallengeRequest, request_obj: Request, db: Session = Depends(get_db)):
+    # Ask the AI to parse it into structured trades
     try:
-        user_details = authenticate_and_get_user_details(request_obj)
-        user_id = user_details.get("user_id")
-
-        quota = get_challenge_quota(db, user_id)
-        if not quota:
-            quota = create_challenge_quota(db, user_id)
-
-        quota = reset_quota_if_needed(db, quota)
-
-        if quota.quota_remaining <= 0:
-            raise HTTPException(status_code=429, detail="Quota exhausted")
-
-        challenge_data = generate_challenge_with_ai(request.difficulty)
-
-        new_challenge = create_challenge(
-            db=db,
-            difficulty=request.difficulty,
-            created_by=user_id,
-            title=challenge_data["title"],
-            options=json.dumps(challenge_data["options"]),
-            correct_answer_id=challenge_data["correct_answer_id"],
-            explanation=challenge_data["explanation"]
-        )
-
-        quota.quota_remaining -= 1
-        db.commit()
-
-        return {
-            "id": new_challenge.id,
-            "difficulty": request.difficulty,
-            "title": new_challenge.title,
-            "options": json.loads(new_challenge.options),
-            "correct_answer_id": new_challenge.correct_answer_id,
-            "explanation": new_challenge.explanation,
-            "timestamp": new_challenge.date_created.isoformat()
-        }
-
+        ai_trades = parse_trades_from_csv_with_ai(csv_text)
     except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=500, detail=f"AI parsing failed: {e}")
 
+    inserted = 0
+    created_trade_ids = []
 
-@router.get("/my-history")
-async def my_history(request: Request, db: Session = Depends(get_db)):
-    user_details = authenticate_and_get_user_details(request)
-    user_id = user_details.get("user_id")
+    for t in ai_trades:
+        try:
+            ticker = t["ticker"]
+            mistake = t.get("mistake", "None")
+            notes = t.get("notes", "")
+            transactions = t["transactions"]
 
-    challenges = get_user_challenges(db, user_id)
-    return {"challenges": challenges}
+            # Ensure required transaction fields exist
+            normalized_txs = []
+            for tx in transactions:
+                normalized_txs.append(
+                    {
+                        "type": tx["type"],  # "buy" / "sell"
+                        "date": tx["date"],  # ISO string
+                        "amount": float(tx["amount"]),
+                        "price": float(tx["price"]),
+                        "commissions": float(tx.get("commissions", 0.0)),
+                    }
+                )
 
+            trade = create_trade(
+                db=db,
+                user_id=user_id,
+                ticker=ticker,
+                mistake=mistake,
+                notes=notes,
+                transactions=normalized_txs,
+            )
 
-@router.get("/quota")
-async def get_quota(request: Request, db: Session = Depends(get_db)):
-    user_details = authenticate_and_get_user_details(request)
-    user_id = user_details.get("user_id")
+            inserted += 1
+            created_trade_ids.append(trade.id)
+        except Exception as e:
+            # Skip bad entries but keep going
+            print("Error inserting trade from AI:", e)
+            continue
 
-    quota = get_challenge_quota(db, user_id)
-    if not quota:
-        return {
-            "user_id": user_id,
-            "quota_remaining": 0,
-            "last_reset_date": datetime.now()
-        }
-
-    quota = reset_quota_if_needed(db, quota)
-    return quota
+    return {
+        "status": "success",
+        "inserted": inserted,
+        "trade_ids": created_trade_ids,
+    }

@@ -73,6 +73,7 @@ export function TradeDetail() {
           symbol={trade.ticker}
           startDate={trade.earliest_transaction}
           endDate={trade.latest_transaction}
+          transactions={trade.transactions}
         />
       </div>
 
