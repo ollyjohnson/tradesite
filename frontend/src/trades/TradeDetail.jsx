@@ -1,4 +1,4 @@
-import { use, useEffect, useState } from "react"
+import { useEffect, useState } from "react"
 import { useParams } from "react-router-dom"
 import { useApi } from "../utils/api"
 import { TradeChart } from "./TradeChart"
@@ -61,9 +61,7 @@ export function TradeDetail() {
         </div>
         <div className="sm:col-span-2">
           <span className="font-semibold text-white">PnL: </span>{" "}
-          <span className="text-green-400 font-medium">
-            +{trade.pnl.toFixed(2)}
-          </span>
+          {formatPnl(trade.pnl, trade.status)}
         </div>
       </div>
       <br></br>
@@ -80,11 +78,21 @@ export function TradeDetail() {
       <div>
         <h2 className="text-xl font-semibold mb-2">Transactions</h2>
         <ul className="pl-4 list-disc">
-          {trade.transactions?.map((tx, i) => (
-            <li key={i}>
-              {tx.type.toUpperCase()} {tx.amount} @ ${tx.price} on {new Date(tx.date).toLocaleDateString()} (Fees: ${tx.commissions})
-            </li>
-          ))}
+          {trade.transactions?.map((tx, i) => {
+            const dt = new Date(tx.date)
+            const dateStr = dt.toLocaleDateString()
+            const timeStr = dt.toLocaleTimeString([], {
+              hour: "2-digit",
+              minute: "2-digit",
+            })
+
+            return (
+              <li key={i}>
+                {tx.type.toUpperCase()} {tx.amount} @ ${tx.price} on {dateStr} at{" "}
+                {timeStr} (Fees: ${tx.commissions})
+              </li>
+            )
+          })}
         </ul>
       </div>
     </div>

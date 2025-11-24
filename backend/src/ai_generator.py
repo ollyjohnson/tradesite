@@ -68,7 +68,7 @@ Rules:
 - "amount" is the number of shares/contracts (positive float).
 - "price" is the fill price.
 - "commissions" includes any per-row fees (0 if none given).
-- "date" must be ISO 8601, "YYYY-MM-DDTHH:MM:SS" in local time of the trade.
+- "date" must be in ISO format like YYYY-MM-DD or YYYY-MM-DDTHH:MM:SSZ (UTC). Do not include words like UTC or other time zone names
 - Only include fields shown above; no extra fields.
 - If you are unsure about how to parse something, make your best reasonable guess.
 - You MUST return valid JSON matching this shape and nothing else.
@@ -86,7 +86,14 @@ Rules:
         )
 
         content = response.choices[0].message.content
+
+        print("AI CSV raw content:")
+        print(content)
+
         data = json.loads(content)
+
+        print("AI CSV parsed JSON:")
+        print(json.dumps(data, indent=2))
 
         if "trades" not in data or not isinstance(data["trades"], list):
             raise ValueError("AI response missing 'trades' list")

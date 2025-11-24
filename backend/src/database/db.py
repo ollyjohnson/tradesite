@@ -1,77 +1,113 @@
 from sqlalchemy.orm import Session
 from sqlalchemy import desc, nullsfirst
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from fastapi import HTTPException
 from . import models
-from zoneinfo import ZoneInfo
 
-
-def get_challenge_quota(db: Session, user_id: str):
-    return (db.query(models.ChallengeQuota)
-            .filter(models.ChallengeQuota.user_id == user_id)
-            .first())
-
-
-def create_challenge_quota(db: Session, user_id: str):
-    db_quota = models.ChallengeQuota(user_id=user_id)
-    db.add(db_quota)
-    db.commit()
-    db.refresh(db_quota)
-    return db_quota
-
-
-def reset_quota_if_needed(db: Session, quota: models.ChallengeQuota):
-    now = datetime.now()
-    if now - quota.last_reset_date > timedelta(hours=24):
-        quota.quota_remaining = 10
-        quota.last_reset_date = now
-        db.commit()
-        db.refresh(quota)
-    return quota
-
-
-def create_challenge(
-    db: Session,
-    difficulty: str,
-    created_by: str,
-    title: str,
-    options: str,
-    correct_answer_id: int,
-    explanation: str
-):
-    db_challenge = models.Challenge(
-        difficulty=difficulty,
-        created_by=created_by,
-        title=title,
-        options=options,
-        correct_answer_id=correct_answer_id,
-        explanation=explanation
-    )
-    db.add(db_challenge)
-    db.commit()
-    db.refresh(db_challenge)
-    return db_challenge
-
-
-def get_user_challenges(db: Session, user_id: str):
-    return db.query(models.Challenge).filter(models.Challenge.created_by == user_id).all()
-
-###
 def parse_datetime_to_utc(dt_input):
-    UTC = ZoneInfo("UTC")
+    """
+    Normalise various datetime formats to a naive UTC datetime
+    suitable for storing in SQLite.
+
+    Accepts:
+    - Python datetime objects (naive or tz-aware)
+    - Strings like:
+        "2024-01-02"
+        "2024-01-02T14:30:00"
+        "2024-01-02T14:30:00Z"
+        "2024-01-02T14:30:00+00:00"
+        "2024-01-02 14:30:00 UTC"
+    """
+
+    # If it's already a datetime, just normalise to UTC
     if isinstance(dt_input, datetime):
-        if dt_input.tzinfo is None:
-            dt_input = dt_input.replace(tzinfo=UTC)
-        return dt_input.astimezone(UTC)
+        dt = dt_input
     elif isinstance(dt_input, str):
-        dt = datetime.fromisoformat(dt_input)
-        if dt.tzinfo is None:
-            dt = dt.replace(tzinfo=UTC)
-        return dt.astimezone(UTC)
+        s = dt_input.strip()
+
+        # Handle trailing " UTC"
+        if s.endswith(" UTC"):
+            s = s[:-4].strip()
+
+        # Convert trailing 'Z' to a proper offset
+        if s.endswith("Z"):
+            s = s[:-1] + "+00:00"
+
+        # If it looks like a bare date ("YYYY-MM-DD"), add time
+        if len(s) == 10 and s[4] == "-" and s[7] == "-":
+            s = s + "T00:00:00"
+
+        dt = datetime.fromisoformat(s)
     else:
         raise TypeError("Unsupported datetime input")
+
+    # If there's no tzinfo, assume it's already UTC
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    else:
+        dt = dt.astimezone(timezone.utc)
+
+    # Store as naive UTC in the DB
+    return dt.replace(tzinfo=None)
+
+def normalise_transactions_for_compare(transactions):
+    """
+    Turn a list of transactions (dicts or ORM objects) into a
+    sorted, hashable representation so we can detect duplicates.
+    """
+    norm = []
+
+    for tx in transactions:
+        # handle both dicts (from API/AI) and ORM objects (from DB)
+        if isinstance(tx, dict):
+            dt_in = tx["date"]
+            tx_type = tx["type"]
+            amount = float(tx["amount"])
+            price = float(tx["price"])
+            commissions = float(tx.get("commissions") or 0)
+        else:
+            dt_in = tx.date
+            tx_type = tx.type
+            amount = float(tx.amount)
+            price = float(tx.price)
+            commissions = float(tx.commissions)
+
+        dt = parse_datetime_to_utc(dt_in)
+
+        norm.append(
+            (
+                dt.isoformat(timespec="microseconds"),
+                tx_type.lower(),
+                round(amount, 8),
+                round(price, 8),
+                round(commissions, 8),
+            )
+        )
+
+    # order doesn’t matter, so sort then freeze as a tuple
+    norm.sort()
+    return tuple(norm)
+
+
     
-def create_trade(db: Session, user_id: str,ticker:str, mistake:str,notes: str, transactions: list):
+def create_trade(db: Session, user_id: str, ticker: str, mistake: str, notes: str, transactions: list):
+    # --- DUPLICATE CHECK ---
+    new_norm = normalise_transactions_for_compare(transactions)
+
+    existing_trades = (
+        db.query(models.Trade)
+        .filter(models.Trade.user_id == user_id, models.Trade.ticker == ticker)
+        .all()
+    )
+
+    for existing in existing_trades:
+        existing_norm = normalise_transactions_for_compare(existing.transactions)
+        if existing_norm == new_norm:
+            print("Duplicate trade detected for user", user_id, "ticker", ticker, "- skipping insert")
+            # Just return the existing trade instead of creating a new one
+            return existing
+    # --- END DUPLICATE CHECK ---
+
     latest_transaction = None
     earliest_transaction = None
     trade_type = "Long"
@@ -107,6 +143,7 @@ def create_trade(db: Session, user_id: str,ticker:str, mistake:str,notes: str, t
     db.commit()
     db.refresh(trade)
     return trade
+
 
 def get_trades_by_user(db:Session, user_id: str):
     return db.query(models.Trade).filter(models.Trade.user_id == user_id).order_by(nullsfirst(desc(models.Trade.latest_transaction))).all()

@@ -1,18 +1,15 @@
-from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile, File
+from fastapi import APIRouter, UploadFile, File, Depends, HTTPException, Request, Query
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from typing import List, Literal
 
 from ..ai_generator import parse_trades_from_csv_with_ai
+from ..parse_broker_statement import parse_tradezero_csv
+
 from ..database.db import (
     get_trades_by_user,
     create_trade,
     update_trade,
-    get_challenge_quota,
-    create_challenge,
-    create_challenge_quota,
-    reset_quota_if_needed,
-    get_user_challenges
 )
 from ..utils import authenticate_and_get_user_details
 from ..database.models import get_db
@@ -119,10 +116,11 @@ async def get_trade(trade_id: int, request: Request, db:Session = Depends(get_db
     user_id = user_details.get("user_id")
 
     trade = db.query(models.Trade).filter_by(id=trade_id, user_id=user_id).first()
-    summary = summarise_trade(trade)
 
     if not trade:
         raise HTTPException(status_code=404, detail="Trade not found")
+    
+    summary = summarise_trade(trade)
     
     return {
         "trade": {
@@ -165,6 +163,23 @@ async def delete_trade(trade_id: int, request: Request, db:Session = Depends(get
         print("DELETE FAILED:", e)
         raise HTTPException(status_code=500, detail="Deletion failed")
     return {"message": "Trade deleted"}
+
+@router.delete("/trades")
+async def delete_all_trades(request: Request, db: Session = Depends(get_db)):
+    user_details = authenticate_and_get_user_details(request)
+    user_id = user_details.get("user_id")
+
+    try:
+        q = db.query(models.Trade).filter(models.Trade.user_id == user_id)
+        deleted_count = q.count()
+        q.delete(synchronize_session=False)
+        db.commit()
+        return {"deleted": deleted_count}
+    except Exception as e:
+        db.rollback()
+        print("DELETE ALL FAILED:", e)
+        raise HTTPException(status_code=500, detail="Failed to delete all trades")
+
 
 @router.post("/trades/import-csv")
 async def import_trades_from_csv(
@@ -233,3 +248,42 @@ async def import_trades_from_csv(
         "inserted": inserted,
         "trade_ids": created_trade_ids,
     }
+
+@router.post("/trades/import-broker-csv")
+async def import_broker_csv(
+    request: Request,
+    broker: str = Query(..., description="Broker name, e.g. 'tradezero'"),
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+):
+    user_details = authenticate_and_get_user_details(request)
+    user_id = user_details.get("user_id")
+
+    content = await file.read()
+    try:
+      text = content.decode("utf-8", errors="ignore")
+    except Exception:
+      raise HTTPException(status_code=400, detail="Could not read CSV file")
+
+    # TODO: you implement this based on broker
+    if broker.lower() == "tradezero":
+        trades = parse_tradezero_csv(text)  # you write this
+    else:
+        raise HTTPException(status_code=400, detail=f"Unsupported broker: {broker}")
+
+    if not trades:
+        raise HTTPException(status_code=400, detail="No trades parsed from CSV")
+
+    created_ids = []
+    for t in trades:
+        trade = create_trade(
+            db=db,
+            user_id=user_id,
+            ticker=t["ticker"],
+            mistake=t.get("mistake", "Imported from broker CSV"),
+            notes=t.get("notes", ""),
+            transactions=t["transactions"],
+        )
+        created_ids.append(trade.id)
+
+    return {"created_trade_ids": created_ids, "count": len(created_ids)}

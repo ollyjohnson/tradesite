@@ -26,6 +26,24 @@ export function TradeList() {
         }
     }
 
+    const handleDeleteAll = async () => {
+      const confirmed = window.confirm(
+        "Are you sure you want to delete ALL trades? This cannot be undone."
+      )
+      if (!confirmed) return
+
+      try {
+        await makeRequest("trades", {
+          method: "DELETE",
+        })
+        await fetchTrades()
+      } catch (err) {
+        console.error("Failed to delete all trades", err)
+        alert("Failed to delete all trades. Please try again.")
+      }
+    }
+
+
     const formatPnl = (pnl, status) => {
         if (status == "Open") return <span style={{color: "black"}} > Open </span>
         if (pnl > 0) return <span style={{color: "green"}} > +{pnl.toFixed(2)}</span>
@@ -38,7 +56,17 @@ export function TradeList() {
 
   return (
     <div className="history-panel">
-      <h2 className="text-xl font-semibold text-pink-400 mb-6">Your Trades</h2>
+      <div className="flex items-center justify-between mb-6">
+        <h2 className="text-xl font-semibold text-pink-400">Your Trades</h2>
+        {trades.length > 0 && (
+          <button
+            onClick={handleDeleteAll}
+            className="bg-red-600 hover:bg-red-500 text-white px-4 py-2 rounded-md text-sm shadow cursor-pointer"
+          >
+            Delete All
+          </button>
+        )}
+      </div>
       {trades.length === 0 ? (
         <p className="text-white/80">No trades yet.</p>
       ) : (
@@ -103,17 +131,20 @@ export function TradeList() {
                       e.stopPropagation()
                       const confirmed = window.confirm("Are you sure want to delete this trade?")
                       if (!confirmed) return
+
                       try {
-                        await makeRequest(`trades/${trade.id}`, "DELETE")
+                        await makeRequest(`trades/${trade.id}`, {
+                          method: "DELETE",
+                        })
                         await fetchTrades()
                       } catch (err) {
-                        console.errror("Failed to delete trade", err)
-                        alert("Failed to delete trade. Please try agian.")
+                        console.error("Failed to delete trade", err)
+                        alert("Failed to delete trade. Please try again.")
                       }
                     }}
-                    className="bg-pink-500 bg-opacity-50 text-white px-3 py-1 rounded hover:bg-pink-600 transition"
+                    className="bg-pink-500 bg-opacity-50 text-white px-3 py-1 rounded hover:bg-pink-600 transition cursor-pointer"
                   >
-                  🗑️
+                    🗑️
                   </button>
                 </div>
               </div>
