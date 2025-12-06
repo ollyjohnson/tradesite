@@ -32,6 +32,11 @@ class TradeCreateRequest(BaseModel):
     notes: str = ""
     transactions: List[TradeTransactionIn]
 
+class TradeNotesUpdate(BaseModel):
+    mistake: str
+    notes: str = ""
+
+
 @router.post("/trades")
 async def add_trade(request: TradeCreateRequest, request_obj: Request, db:Session = Depends(get_db)):
     user_details = authenticate_and_get_user_details(request_obj)
@@ -287,3 +292,36 @@ async def import_broker_csv(
         created_ids.append(trade.id)
 
     return {"created_trade_ids": created_ids, "count": len(created_ids)}
+
+@router.patch("/trades/{trade_id}/notes")
+async def update_trade_notes(
+    trade_id: int,
+    request_data: TradeNotesUpdate,
+    request: Request,
+    db: Session = Depends(get_db),
+):
+    user_details = authenticate_and_get_user_details(request)
+    user_id = user_details.get("user_id")
+
+    trade = (
+        db.query(models.Trade)
+        .filter(models.Trade.id == trade_id, models.Trade.user_id == user_id)
+        .first()
+    )
+    if not trade:
+        raise HTTPException(status_code=404, detail="Trade not found")
+
+    trade.mistake = request_data.mistake
+    trade.notes = request_data.notes
+
+    db.add(trade)
+    db.commit()
+    db.refresh(trade)
+
+    return {
+        "status": "updated",
+        "trade_id": trade.id,
+        "mistake": trade.mistake,
+        "notes": trade.notes,
+    }
+

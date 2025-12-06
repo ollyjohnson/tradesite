@@ -46,8 +46,6 @@ class Trade(Base):
     notes = Column(Text)
     latest_transaction = Column(DateTime, nullable=True)
     earliest_transaction = Column(DateTime, nullable=True)
-
-    # ORM-level cascade; passive_deletes lets the DB handle ON DELETE CASCADE
     transactions = relationship(
         "TradeTransaction",
         back_populates="trade",
@@ -60,7 +58,6 @@ class TradeTransaction(Base):
     __tablename__ = "trade_transactions"
 
     id = Column(Integer, primary_key=True)
-    # DB-level cascade
     trade_id = Column(Integer, ForeignKey("trades.id", ondelete="CASCADE"), nullable=False)
     type = Column(Enum("buy", "sell", name="transation_type"), nullable=False)
     date = Column(DateTime, nullable=False)
