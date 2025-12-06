@@ -1,7 +1,10 @@
 from fastapi import APIRouter, UploadFile, File, Depends, HTTPException, Request, Query
+from fastapi.responses import Response
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from typing import List, Literal
+from io import StringIO
+import csv
 
 from ..ai_generator import parse_trades_from_csv_with_ai
 from ..parse_broker_statement import parse_tradezero_csv
@@ -114,42 +117,6 @@ async def get_trades(request: Request, db:Session = Depends(get_db)):
         })
 
     return {"trades": summarised}
-
-@router.get("/trades/{trade_id}")
-async def get_trade(trade_id: int, request: Request, db:Session = Depends(get_db)):
-    user_details = authenticate_and_get_user_details(request)
-    user_id = user_details.get("user_id")
-
-    trade = db.query(models.Trade).filter_by(id=trade_id, user_id=user_id).first()
-
-    if not trade:
-        raise HTTPException(status_code=404, detail="Trade not found")
-    
-    summary = summarise_trade(trade)
-    
-    return {
-        "trade": {
-            "id": trade.id,
-            "ticker": trade.ticker,
-            "status": summary["status"],
-            "pnl": summary["pnl"],
-            "mistake": trade.mistake,
-            "notes": trade.notes,
-            "trade_type": trade.trade_type,
-            "earliest_transaction": trade.earliest_transaction,
-            "latest_transaction": trade.latest_transaction,
-            "transactions": [
-                {
-                    "type": tx.type,
-                    "amount": tx.amount,
-                    "price": tx.price,
-                    "commissions": tx.commissions,
-                    "date": tx.date,
-                }
-                for tx in trade.transactions
-            ]
-        }
-    }
 
 @router.delete("/trades/{trade_id}")
 async def delete_trade(trade_id: int, request: Request, db:Session = Depends(get_db)):
@@ -325,3 +292,129 @@ async def update_trade_notes(
         "notes": trade.notes,
     }
 
+@router.get("/trades/export-csv")
+async def export_trades_csv(
+    request: Request,
+    db: Session = Depends(get_db),
+) -> Response:
+    """
+    Export all trades for the current user as a CSV file.
+
+    Columns:
+    Trade, Side, Buy Date, Buy Price,
+    Sell Date 1, Sell Price 1, ..., Sell Date N, Sell Price N, Profit/Loss
+
+    N is the maximum number of sells on any trade.
+    """
+    user_details = authenticate_and_get_user_details(request)
+    user_id = user_details.get("user_id")
+
+    trades: List[models.Trade] = get_trades_by_user(db, user_id)
+
+    output = StringIO()
+    writer = csv.writer(output)
+
+    max_sells = 0
+    trade_data = []
+
+    for trade in trades:
+        txs = sorted(trade.transactions, key=lambda t: t.date)
+        buys = [t for t in txs if t.type == "buy"]
+        sells = [t for t in txs if t.type == "sell"]
+        max_sells = max(max_sells, len(sells))
+
+        trade_data.append((trade, txs, buys, sells))
+
+    header = ["Trade", "Side", "Buy Date", "Buy Price"]
+    for i in range(1, max_sells + 1):
+        header.append(f"Sell Date {i}")
+        header.append(f"Sell Price {i}")
+    header.append("Profit/Loss")
+    writer.writerow(header)
+
+    for trade, txs, buys, sells in trade_data:
+        side = trade.trade_type or "Long"
+
+        buy_date_str = ""
+        buy_price_str = ""
+        if buys:
+            total_shares = sum(b.amount for b in buys)
+            if total_shares > 0:
+                avg_buy_price = sum(b.amount * b.price for b in buys) / total_shares
+                buy_price_str = f"{avg_buy_price:.4f}"
+            first_buy_date = buys[0].date
+            buy_date_str = first_buy_date.strftime("%Y-%m-%d %H:%M:%S")
+
+        sell_cells: List[str] = []
+        for s in sells:
+            sell_cells.append(s.date.strftime("%Y-%m-%d %H:%M:%S"))
+            sell_cells.append(f"{s.price:.4f}")
+
+        while len(sell_cells) < max_sells * 2:
+            sell_cells.append("")
+            sell_cells.append("")
+
+        if buys and sells and sum(b.amount for b in buys) == sum(s.amount for s in sells):
+            buy_total = sum(b.amount * b.price for b in buys)
+            sell_total = sum(s.amount * s.price for s in sells)
+            total_commissions = sum(tx.commissions for tx in txs)
+            pnl = sell_total - buy_total - total_commissions
+        else:
+            pnl = 0.0
+
+        row = [
+            trade.ticker,
+            side,
+            buy_date_str,
+            buy_price_str,
+            *sell_cells,
+            f"{pnl:.2f}",
+        ]
+        writer.writerow(row)
+
+    csv_data = output.getvalue()
+    output.close()
+
+    return Response(
+        content=csv_data,
+        media_type="text/csv",
+        headers={
+            "Content-Disposition": 'attachment; filename="trades_export.csv"'
+        },
+    )
+
+@router.get("/trades/{trade_id}")
+async def get_trade(trade_id: int, request: Request, db:Session = Depends(get_db)):
+    user_details = authenticate_and_get_user_details(request)
+    user_id = user_details.get("user_id")
+
+    trade = db.query(models.Trade).filter_by(id=trade_id, user_id=user_id).first()
+
+    if not trade:
+        raise HTTPException(status_code=404, detail="Trade not found")
+    
+    summary = summarise_trade(trade)
+    
+    return {
+        "trade": {
+            "id": trade.id,
+            "ticker": trade.ticker,
+            "status": summary["status"],
+            "pnl": summary["pnl"],
+            "mistake": trade.mistake,
+            "notes": trade.notes,
+            "trade_type": trade.trade_type,
+            "earliest_transaction": trade.earliest_transaction,
+            "latest_transaction": trade.latest_transaction,
+            "transactions": [
+                {
+                    "type": tx.type,
+                    "amount": tx.amount,
+                    "price": tx.price,
+                    "commissions": tx.commissions,
+                    "date": tx.date,
+                }
+                for tx in trade.transactions
+            ]
+        }
+    }

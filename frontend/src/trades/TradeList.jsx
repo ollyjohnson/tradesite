@@ -1,9 +1,11 @@
 import { useEffect, useState } from "react"
 import { useApi } from "../utils/api"
 import { useNavigate } from "react-router-dom"
+import { useAuth } from "@clerk/clerk-react" 
 
 export function TradeList() {
     const { makeRequest } = useApi()
+    const { getToken } = useAuth()
     const [trades, setTrades] = useState([])
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState(null)
@@ -51,6 +53,35 @@ export function TradeList() {
         return <span style={{color: "black" }}>0.00</span>
     }
 
+    const handleDownloadCsv = async () => {
+      try {
+        const token = await getToken()
+        const res = await fetch("http://localhost:8000/api/trades/export-csv", {
+          method: "GET",
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        })
+
+        if (!res.ok) {
+          throw new Error("Failed to download CSV")
+        }
+
+        const blob = await res.blob()
+        const url = window.URL.createObjectURL(blob)
+        const a = document.createElement("a")
+        a.href = url
+        a.download = "trades_export.csv"
+        document.body.appendChild(a)
+        a.click()
+        a.remove()
+        window.URL.revokeObjectURL(url)
+      } catch (err) {
+        console.error(err)
+        alert("Could not download CSV: " + err.message)
+      }
+    }
+
     if (loading) return <div className="text-white text-center mt-8">Loading trades...</div>
     if (error) return <div className="text-red-400 text-center mt-8">{error}</div>
 
@@ -58,6 +89,12 @@ export function TradeList() {
     <div className="history-panel">
       <div className="flex items-center justify-between mb-6">
         <h2 className="text-xl font-semibold text-pink-400">Your Trades</h2>
+        <button
+          onClick={handleDownloadCsv}
+          className="bg-pink-600 hover:bg-pink-500 text-white px-3 py-1 rounded-md text-sm shadow"
+        >
+          Download CSV
+        </button>
         {trades.length > 0 && (
           <button
             onClick={handleDeleteAll}
