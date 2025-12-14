@@ -13,6 +13,9 @@ export function Layout() {
             <Link to="/" className="hover:text-pink-400 transition">
               My Trades
             </Link>
+            <Link to="/dashboard" className="hover:text-pink-400 transition">
+              Dashboard
+            </Link>
             <Link to="/log-trade" className="hover:text-pink-400 transition">
               Log Trade
             </Link>

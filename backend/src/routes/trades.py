@@ -4,6 +4,7 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from typing import List, Literal
 from io import StringIO
+from collections import defaultdict
 import csv
 
 from ..ai_generator import parse_trades_from_csv_with_ai
@@ -415,3 +416,115 @@ async def get_trade(trade_id: int, request: Request, db:Session = Depends(get_db
             ]
         }
     }
+
+def _trade_is_closed(trade: models.Trade):
+    buys = [tx for tx in trade.transactions if tx.type == "buy"]
+    sells = [tx for tx in trade.transactions if tx.type == "sell"]
+    return abs(sum(b.amount for b in buys) - sum(s.amount for s in sells)) < 1e-9
+
+def _trade_pnl_and_base(trade: models.Trade):
+    txs = sorted(trade.transactions, key=lambda t: t.date)
+    buys = [tx for tx in txs if tx.type == "buy"]
+    sells = [tx for tx in txs if tx.type == "sell"]
+
+    buy_total = sum(tx.amount * tx.price for tx in buys)
+    sell_total = sum(tx.amount * tx.price for tx in sells)
+    commissions = sum(tx.commissions for tx in txs)
+
+    pnl = sell_total - buy_total - commissions
+
+    if (trade.trade_type or "Long").lower() == "short":
+        base = sell_total
+    else:
+        base = buy_total
+    
+    return pnl, base
+
+@router.get("/dashboard")
+async def get_dashboard(request: Request, db: Session = Depends(get_db)):
+    user_details = authenticate_and_get_user_details(request)
+    user_id = user_details.get("user_id")
+
+    trades = get_trades_by_user(db, user_id)
+
+    closed = [t for t in trades if _trade_is_closed(t)]
+
+    pnl_by_day = defaultdict(float)
+    for t in closed:
+        close_dt = t.latest_transaction or t.earliest_transaction
+        if not close_dt:
+            continue
+        day = close_dt.date().isoformat()
+
+        pnl, _base = _trade_pnl_and_base(t)
+        pnl_by_day[day] += float(pnl)
+    
+    days_sorted = sorted(pnl_by_day.keys())
+    equity_curve = []
+    running = 0.0
+
+    for d in days_sorted:
+        running += pnl_by_day[d]
+        equity_curve.append({"time":d, "value": round(running, 2)})
+    
+    pnls = []
+    rets = []
+    for t in closed:
+        pnl, base = _trade_pnl_and_base(t)
+        pnl = float(pnl)
+        pnls.append(pnl)
+
+        if base and abs(base) > 1e-12:
+            rets.append((pnl/ float(base)) * 100.0)
+        else:
+            rets.append(0.0)
+        
+    wins = [p for p in pnls if p > 0]
+    losses = [p for p in pnls if p < 0]
+    win_rets = [r for (p,r) in zip(pnls, rets) if p > 0]
+    loss_rets = [r for (p, r) in zip(pnls,rets) if p < 0]
+
+    total_pnl = sum(pnls)
+    avg_win = (sum(wins) / len(wins)) if wins else 0.0
+    avg_loss = (sum(losses) / len(losses)) if losses else 0.0
+    max_win = max(pnls) if pnls else 0.0
+    max_loss = min(pnls) if pnls else 0.0
+    win_pct = (len(wins) / len(pnls) * 100.0) if pnls else 0.0
+
+    sum_wins = sum(wins)
+    sum_losses_abs = abs(sum(losses))
+    profit_factor = (sum_wins / sum_losses_abs) if sum_losses_abs > 1e-12 else (None if sum_wins == 0 else "∞")
+
+    avg_gain_pct = sum(win_rets) / len(win_rets) if win_rets else 0.0
+    avg_loss_pct = sum(loss_rets) / len(loss_rets) if loss_rets else 0.0
+    max_gain_pct = max(rets) if rets else 0.0
+    max_loss_pct = min(rets) if rets else 0.0
+
+    stats = {
+        "total_pnl": round(total_pnl, 2),
+        "avg_loss": round(avg_loss, 2),
+        "avg_win": round(avg_win, 2),
+        "max_loss": round(max_loss, 2),
+        "max_win": round(max_win, 2),
+        "win_pct": round(win_pct, 2),
+        "profit_factor": None if profit_factor is None else (profit_factor if profit_factor == float("inf") else round(profit_factor, 2)),
+        "avg_loss_pct": round(avg_loss_pct, 2),
+        "avg_gain_pct": round(avg_gain_pct, 2),
+        "max_loss_pct": round(max_loss_pct, 2),
+        "max_gain_pct": round(max_gain_pct, 2),
+    }
+
+    mistake_map = defaultdict(lambda: {"count": 0, "pnl":0.0})
+    for t in closed:
+        m = (t.mistake or "None").strip() or "None"
+        pnl, _base = _trade_pnl_and_base(t)
+        mistake_map[m]["count"] += 1
+        mistake_map[m]["pnl"] += float(pnl)
+    
+    mistakes = [
+        {"mistake": k, "count": v["count"], "pnl": round(v["pnl"], 2)}
+        for k, v in mistake_map.items()
+    ]
+    mistakes.sort(key=lambda x: x["count"], reverse=True)
+
+    return {"equity_curve": equity_curve, "stats": stats, "mistakes": mistakes}

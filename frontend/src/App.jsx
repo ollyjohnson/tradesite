@@ -6,6 +6,7 @@ import {TradeForm} from "./trades/TradeForm.jsx"
 import { TradeList } from "./trades/TradeList.jsx"
 import {EditTradeForm} from "./trades/EditTradeForm"
 import {TradeDetail} from "./trades/TradeDetail.jsx"
+import { Dashboard } from "./dashboard/Dashboard.jsx"
 import './App.css'
 
 function App() {
@@ -15,6 +16,7 @@ function App() {
             <Route path="/sign-up" element={<AuthenticationPage />} />
             <Route element={<Layout />}>
                 <Route path="/" element={<TradeList />}/>
+                <Route path="/dashboard" element={<Dashboard />} />
                 <Route path="/log-trade" element={<TradeForm />}/>
                 <Route path="/my-trades" element={<TradeList />} />
                 <Route path="/trade/:id" element={<TradeDetail />} />
