@@ -76,7 +76,7 @@ Rules:
 
     try:
         response = client.chat.completions.create(
-            model="gpt-4o-mini",   # or gpt-4.1-mini / gpt-3.5-turbo-0125 etc
+            model="gpt-4o-mini",
             messages=[
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": csv_text},
@@ -101,6 +101,5 @@ Rules:
         return data["trades"]
 
     except Exception as e:
-        # log and re-raise for now
         print("Error parsing trades with AI:", e)
         raise

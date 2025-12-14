@@ -15,16 +15,14 @@ export function TradeChart({ symbol, startDate, endDate, transactions = [] }) {
     let chart
     let series
 
-    // --- helper: date only ---
     const toDateOnly = (value) => {
       if (!value) return ""
       if (typeof value === "string") {
-        return value.split("T")[0] // "YYYY-MM-DD"
+        return value.split("T")[0]
       }
       return new Date(value).toISOString().split("T")[0]
     }
 
-    // --- helper: simple moving average ---
     const calcSMA = (candles, period) => {
       const result = []
       if (!candles || candles.length < period) return result
@@ -40,7 +38,7 @@ export function TradeChart({ symbol, startDate, endDate, transactions = [] }) {
 
         if (i >= period - 1) {
           result.push({
-            time: candles[i].time,       // align MA point with candle time
+            time: candles[i].time,
             value: sum / period,
           })
         }
@@ -52,7 +50,6 @@ export function TradeChart({ symbol, startDate, endDate, transactions = [] }) {
       setLoading(true)
       setError(null)
 
-      // 1) create chart
       chart = createChart(container, {
         width: container.clientWidth,
         height: 300,
@@ -75,7 +72,6 @@ export function TradeChart({ symbol, startDate, endDate, transactions = [] }) {
         },
       })
 
-      // 2) main candlestick series
       series = chart.addSeries(CandlestickSeries, {
         upColor: "#26a69a",
         downColor: "#ef5350",
@@ -85,7 +81,7 @@ export function TradeChart({ symbol, startDate, endDate, transactions = [] }) {
       })
 
       try {
-        // 3) fetch OHLC data from your backend
+        // fetch candlestick data from backend
         const params = new URLSearchParams({
           symbol,
           start_date: toDateOnly(startDate),
@@ -93,31 +89,26 @@ export function TradeChart({ symbol, startDate, endDate, transactions = [] }) {
         })
 
         const data = await makeRequest(`stock-data?${params.toString()}`)
-        // data: [{ time, open, high, low, close }, ...]
 
         series.setData(data)
 
-        // --- 4) moving averages ---
-
-        // compute 10-day and 20-day SMA from close
+        // compute 10 and 20 day SMAs
         const sma10 = calcSMA(data, 10)
         const sma20 = calcSMA(data, 20)
 
-        // 10-day MA line
         const ma10Series = chart.addSeries(LineSeries, {
           lineWidth: 1,
           color: '#ab30f2',
         })
         ma10Series.setData(sma10)
 
-        // 20-day MA line
         const ma20Series = chart.addSeries(LineSeries, {
           lineWidth: 1,
           color: '#c3de14',
         })
         ma20Series.setData(sma20)
 
-        // 5) build markers from transactions
+        // add transaction markers
         const markers = (transactions || [])
           .filter((tx) => tx.date && tx.type && tx.amount && tx.price)
           .map((tx) => {
@@ -128,7 +119,7 @@ export function TradeChart({ symbol, startDate, endDate, transactions = [] }) {
                 ? tx.date
                 : new Date(tx.date).toISOString()
 
-            const dateStr = iso.split("T")[0] // "YYYY-MM-DD"
+            const dateStr = iso.split("T")[0]
 
             return {
               time: dateStr,

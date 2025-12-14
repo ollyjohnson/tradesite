@@ -11,11 +11,9 @@ export function TradeForm({ initialData = null, onSubmit = null }) {
   const [sells, setSells] = useState([])
   const [message, setMessage] = useState(null)
 
-  // AI CSV import state
   const [csvFile, setCsvFile] = useState(null)
   const [importingCsv, setImportingCsv] = useState(false)
 
-  // Broker CSV import state
   const [broker, setBroker] = useState("tradezero")
   const [brokerCsvFile, setBrokerCsvFile] = useState(null)
   const [importingBrokerCsv, setImportingBrokerCsv] = useState(false)
@@ -25,7 +23,6 @@ export function TradeForm({ initialData = null, onSubmit = null }) {
   const formatTime = (iso) => {
   if (!iso) return ""
   const d = new Date(iso)
-  // "HH:MM" for the time input
   return d.toTimeString().slice(0, 5)
   }
 
@@ -69,7 +66,6 @@ export function TradeForm({ initialData = null, onSubmit = null }) {
     setList(updated)
   }
 
-  // Import CSV via AI
   const handleImportCsv = async () => {
     if (!csvFile) return
 
@@ -100,7 +96,6 @@ export function TradeForm({ initialData = null, onSubmit = null }) {
     }
   }
 
-  // Import CSV via broker-specific parser (no AI)
   const handleImportBrokerCsv = async () => {
     if (!brokerCsvFile || !broker) return
 
@@ -111,7 +106,6 @@ export function TradeForm({ initialData = null, onSubmit = null }) {
       const formData = new FormData()
       formData.append("file", brokerCsvFile)
 
-      // backend will key off the `broker` query param
       const result = await makeRequest(
         `trades/import-broker-csv?broker=${encodeURIComponent(broker)}`,
         {
@@ -141,7 +135,6 @@ export function TradeForm({ initialData = null, onSubmit = null }) {
     const toIsoDateTime = (dateStr, timeStr) => {
       if (!dateStr) return null
       const time = timeStr && timeStr.trim() !== "" ? timeStr : "00:00"
-      // assume local time, convert to ISO
       return new Date(`${dateStr}T${time}`).toISOString()
     }
 
@@ -176,7 +169,6 @@ export function TradeForm({ initialData = null, onSubmit = null }) {
 
   return (
     <div className="challenge-container space-y-8">
-      {/* SECTION 1: Import via AI */}
       <section className="p-4 border border-white/10 rounded-md bg-white/5">
         <h2 className="text-xl font-semibold text-pink-400 mb-2">
           Import Trades from CSV (AI)
@@ -204,7 +196,6 @@ export function TradeForm({ initialData = null, onSubmit = null }) {
         </div>
       </section>
 
-      {/* SECTION 2: Import via Broker-specific parser */}
       <section className="p-4 border border-white/10 rounded-md bg-white/5">
         <h2 className="text-xl font-semibold text-pink-400 mb-2">
           Import Trades from Broker CSV
@@ -219,7 +210,6 @@ export function TradeForm({ initialData = null, onSubmit = null }) {
             onChange={(e) => setBroker(e.target.value)}
             className="input max-w-xs"
           >
-            {/* more brokers can be added here later */}
             <option value="tradezero">TradeZero</option>
           </select>
 
@@ -241,7 +231,6 @@ export function TradeForm({ initialData = null, onSubmit = null }) {
         </button>
       </section>
 
-      {/* SECTION 3: Manual entry */}
       <section className="p-4 border border-white/10 rounded-md bg-white/5">
         <h2 className="text-xl font-semibold mb-4">
           {onSubmit ? "Edit Trade" : "Log a Trade Manually"}
@@ -271,7 +260,6 @@ export function TradeForm({ initialData = null, onSubmit = null }) {
             onChange={(e) => setNotes(e.target.value)}
           />
 
-          {/* Buy Transactions */}
           <h3 className="text-xl font-semibold text-pink-400 mb-2 mt-6">
             Buy Transactions
           </h3>
@@ -339,7 +327,6 @@ export function TradeForm({ initialData = null, onSubmit = null }) {
           ))}
 
 
-          {/* Sell Transactions */}
           <h3 className="text-xl font-semibold text-pink-400 mb-2 mt-6">
             Sell Transactions
           </h3>

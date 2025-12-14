@@ -13,6 +13,7 @@ from ..database.db import (
     get_trades_by_user,
     create_trade,
     update_trade,
+    upsert_trade_from_import,
 )
 from ..utils import authenticate_and_get_user_details
 from ..database.models import get_db
@@ -170,7 +171,6 @@ async def import_trades_from_csv(
     content_bytes = await file.read()
     csv_text = content_bytes.decode("utf-8", errors="ignore")
 
-    # Ask the AI to parse it into structured trades
     try:
         ai_trades = parse_trades_from_csv_with_ai(csv_text)
     except Exception as e:
@@ -186,13 +186,12 @@ async def import_trades_from_csv(
             notes = t.get("notes", "")
             transactions = t["transactions"]
 
-            # Ensure required transaction fields exist
             normalized_txs = []
             for tx in transactions:
                 normalized_txs.append(
                     {
-                        "type": tx["type"],  # "buy" / "sell"
-                        "date": tx["date"],  # ISO string
+                        "type": tx["type"],
+                        "date": tx["date"],
                         "amount": float(tx["amount"]),
                         "price": float(tx["price"]),
                         "commissions": float(tx.get("commissions", 0.0)),
@@ -211,7 +210,6 @@ async def import_trades_from_csv(
             inserted += 1
             created_trade_ids.append(trade.id)
         except Exception as e:
-            # Skip bad entries but keep going
             print("Error inserting trade from AI:", e)
             continue
 
@@ -237,9 +235,8 @@ async def import_broker_csv(
     except Exception:
       raise HTTPException(status_code=400, detail="Could not read CSV file")
 
-    # TODO: you implement this based on broker
     if broker.lower() == "tradezero":
-        trades = parse_tradezero_csv(text)  # you write this
+        trades = parse_tradezero_csv(text)
     else:
         raise HTTPException(status_code=400, detail=f"Unsupported broker: {broker}")
 
@@ -248,7 +245,7 @@ async def import_broker_csv(
 
     created_ids = []
     for t in trades:
-        trade = create_trade(
+        trade = upsert_trade_from_import(
             db=db,
             user_id=user_id,
             ticker=t["ticker"],

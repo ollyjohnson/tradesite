@@ -15,12 +15,8 @@ from sqlalchemy.orm import sessionmaker, relationship
 from sqlalchemy.engine import Engine
 from datetime import datetime
 
-# --- Engine & Base ---------------------------------------------------------
-
 engine = create_engine("sqlite:///database.db", echo=True)
 
-
-# Ensure SQLite actually enforces foreign-key constraints
 @event.listens_for(Engine, "connect")
 def set_sqlite_pragma(dbapi_connection, connection_record):
     cursor = dbapi_connection.cursor()
@@ -31,8 +27,6 @@ def set_sqlite_pragma(dbapi_connection, connection_record):
 
 
 Base = declarative_base()
-
-# --- Trade models ----------------------------------------------------------
 
 
 class Trade(Base):
@@ -68,9 +62,6 @@ class TradeTransaction(Base):
     trade = relationship("Trade", back_populates="transactions")
 
 
-# --- Challenge models (unchanged) -----------------------------------------
-
-
 class Challenge(Base):
     __tablename__ = "challenges"
 
@@ -92,8 +83,6 @@ class ChallengeQuota(Base):
     quota_remaining = Column(Integer, nullable=False, default=50)
     last_reset_date = Column(DateTime, default=datetime.now)
 
-
-# --- Session helper --------------------------------------------------------
 
 Base.metadata.create_all(engine)
 

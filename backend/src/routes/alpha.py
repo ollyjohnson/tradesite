@@ -27,7 +27,7 @@ def get_stock_data(symbol: str, start_date: str, end_date: str):
     params = {
         "function": "TIME_SERIES_DAILY",
         "symbol": symbol,
-        "outputsize": "compact",  # free tier
+        "outputsize": "compact",
         "apikey": api_key,
     }
 
@@ -42,18 +42,16 @@ def get_stock_data(symbol: str, start_date: str, end_date: str):
 
     time_series = data.get("Time Series (Daily)")
     if not time_series:
-        # rate limits / errors end up here
         raise HTTPException(
             status_code=502,
             detail=data.get("Note") or data.get("Error Message") or "Unexpected Alpha Vantage response.",
         )
 
-    # Normalize incoming dates to YYYY-MM-DD
+    # Normalise incoming dates to YYYY-MM-DD
     start = start_date[:10]
     end = end_date[:10]
 
-    # Alpha Vantage keys: 'YYYY-MM-DD'
-    all_dates = sorted(time_series.keys())  # oldest -> newest
+    all_dates = sorted(time_series.keys())
 
     if not all_dates:
         return []
@@ -73,7 +71,7 @@ def get_stock_data(symbol: str, start_date: str, end_date: str):
             last_idx = i
             break
 
-    # If we couldn't find any candles overlapping the trade window, return empty.
+    # If we cant find the trade window, return empty
     if first_idx is None or last_idx is None:
         return []
 

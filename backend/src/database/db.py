@@ -6,34 +6,20 @@ from . import models
 
 def parse_datetime_to_utc(dt_input):
     """
-    Normalise various datetime formats to a naive UTC datetime
-    suitable for storing in SQLite.
-
-    Accepts:
-    - Python datetime objects (naive or tz-aware)
-    - Strings like:
-        "2024-01-02"
-        "2024-01-02T14:30:00"
-        "2024-01-02T14:30:00Z"
-        "2024-01-02T14:30:00+00:00"
-        "2024-01-02 14:30:00 UTC"
+    Normalise various datetime formats to a UTC datetime for sqlite
     """
 
-    # If it's already a datetime, just normalise to UTC
     if isinstance(dt_input, datetime):
         dt = dt_input
     elif isinstance(dt_input, str):
         s = dt_input.strip()
 
-        # Handle trailing " UTC"
         if s.endswith(" UTC"):
             s = s[:-4].strip()
 
-        # Convert trailing 'Z' to a proper offset
         if s.endswith("Z"):
             s = s[:-1] + "+00:00"
 
-        # If it looks like a bare date ("YYYY-MM-DD"), add time
         if len(s) == 10 and s[4] == "-" and s[7] == "-":
             s = s + "T00:00:00"
 
@@ -41,24 +27,21 @@ def parse_datetime_to_utc(dt_input):
     else:
         raise TypeError("Unsupported datetime input")
 
-    # If there's no tzinfo, assume it's already UTC
     if dt.tzinfo is None:
         dt = dt.replace(tzinfo=timezone.utc)
     else:
         dt = dt.astimezone(timezone.utc)
 
-    # Store as naive UTC in the DB
     return dt.replace(tzinfo=None)
 
 def normalise_transactions_for_compare(transactions):
     """
-    Turn a list of transactions (dicts or ORM objects) into a
-    sorted, hashable representation so we can detect duplicates.
+    Turn a list of transactions into a sorted 
+    representation for comparison
     """
     norm = []
 
     for tx in transactions:
-        # handle both dicts (from API/AI) and ORM objects (from DB)
         if isinstance(tx, dict):
             dt_in = tx["date"]
             tx_type = tx["type"]
@@ -84,14 +67,13 @@ def normalise_transactions_for_compare(transactions):
             )
         )
 
-    # order doesn’t matter, so sort then freeze as a tuple
     norm.sort()
     return tuple(norm)
 
 
     
 def create_trade(db: Session, user_id: str, ticker: str, mistake: str, notes: str, transactions: list):
-    # --- DUPLICATE CHECK ---
+    
     new_norm = normalise_transactions_for_compare(transactions)
 
     existing_trades = (
@@ -100,13 +82,13 @@ def create_trade(db: Session, user_id: str, ticker: str, mistake: str, notes: st
         .all()
     )
 
+    # Check for duplicates
     for existing in existing_trades:
         existing_norm = normalise_transactions_for_compare(existing.transactions)
         if existing_norm == new_norm:
             print("Duplicate trade detected for user", user_id, "ticker", ticker, "- skipping insert")
-            # Just return the existing trade instead of creating a new one
+            # Return existing trade instead of creating a new one
             return existing
-    # --- END DUPLICATE CHECK ---
 
     latest_transaction = None
     earliest_transaction = None
@@ -190,3 +172,73 @@ def update_trade(db:Session, trade_id: int, user_id: str, data: dict):
     db.refresh(trade)
     return trade
 
+from collections import Counter
+
+def _trade_net_shares(trade: models.Trade) -> float:
+    net = 0.0
+    for tx in trade.transactions:
+        amt = float(tx.amount)
+        if (tx.type or "").lower() == "buy":
+            net += amt
+        else:
+            net -= amt
+    return net
+
+def _norm_is_subset(existing_norm: tuple, new_norm: tuple) -> bool:
+    a = Counter(existing_norm)
+    b = Counter(new_norm)
+    return all(b.get(k, 0) >= v for k, v in a.items())
+
+def upsert_trade_from_import(
+    db: Session,
+    user_id: str,
+    ticker: str,
+    mistake: str,
+    notes: str,
+    transactions: list,
+    preserve_existing_notes_and_mistake: bool = True,
+):
+    new_norm = normalise_transactions_for_compare(transactions)
+
+    existing_trades = (
+        db.query(models.Trade)
+        .filter(models.Trade.user_id == user_id, models.Trade.ticker == ticker)
+        .all()
+    )
+
+    # If its an exact duplicate, return existing
+    for existing in existing_trades:
+        if normalise_transactions_for_compare(existing.transactions) == new_norm:
+            return existing
+
+    # Or merge into existing trade
+    candidates = []
+    for existing in existing_trades:
+        if abs(_trade_net_shares(existing)) < 1e-8:
+            continue
+
+        existing_norm = normalise_transactions_for_compare(existing.transactions)
+        if _norm_is_subset(existing_norm, new_norm):
+            candidates.append((len(existing_norm), existing))
+
+    if candidates:
+        candidates.sort(key=lambda x: x[0], reverse=True)
+        best = candidates[0][1]
+
+        payload = {
+            "ticker": ticker,
+            "mistake": best.mistake if preserve_existing_notes_and_mistake else mistake,
+            "notes": best.notes if preserve_existing_notes_and_mistake else notes,
+            "transactions": transactions,
+        }
+        return update_trade(db=db, trade_id=best.id, user_id=user_id, data=payload)
+
+    # Else create a new trade
+    return create_trade(
+        db=db,
+        user_id=user_id,
+        ticker=ticker,
+        mistake=mistake,
+        notes=notes,
+        transactions=transactions,
+    )

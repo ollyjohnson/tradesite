@@ -17,7 +17,6 @@ def parse_tradezero_csv(csv_text: str) -> List[Dict[str, Any]]:
 
     reader = csv.DictReader(csv_text.splitlines())
 
-    # Collect raw execution rows with full info; we'll split into trades later
     rows: List[Dict[str, Any]] = []
 
     for row in reader:
@@ -29,7 +28,6 @@ def parse_tradezero_csv(csv_text: str) -> List[Dict[str, Any]]:
         side_raw = (row.get("Side") or "").strip().upper()
 
         if side_raw not in {"B", "S"}:
-            # Skip non-buy/sell rows
             continue
 
         qty_raw = (row.get("Qty") or "").strip()
@@ -41,7 +39,6 @@ def parse_tradezero_csv(csv_text: str) -> List[Dict[str, Any]]:
         if not qty_raw or not price_raw or not trade_date_raw:
             continue
 
-        # Parse numeric fields
         try:
             qty = float(qty_raw)
             price = float(price_raw)
@@ -53,7 +50,6 @@ def parse_tradezero_csv(csv_text: str) -> List[Dict[str, Any]]:
         except ValueError:
             commissions = 0.0
 
-        # Date: "MM/DD/YYYY" in sample
         try:
             base_date = datetime.strptime(trade_date_raw, "%m/%d/%Y").date()
         except ValueError:
@@ -62,7 +58,6 @@ def parse_tradezero_csv(csv_text: str) -> List[Dict[str, Any]]:
             except Exception:
                 continue
 
-        # Time: "HH:MM:SS"
         if time_raw:
             try:
                 t = datetime.strptime(time_raw, "%H:%M:%S").time()
@@ -78,7 +73,7 @@ def parse_tradezero_csv(csv_text: str) -> List[Dict[str, Any]]:
         rows.append(
             {
                 "symbol": symbol,
-                "side": side,          # "buy" / "sell"
+                "side": side,
                 "qty": qty,
                 "price": price,
                 "commissions": commissions,
@@ -86,12 +81,11 @@ def parse_tradezero_csv(csv_text: str) -> List[Dict[str, Any]]:
             }
         )
 
-    # Sort all executions by symbol then time
+    # Sort rows by symbold and date time
     rows.sort(key=lambda r: (r["symbol"], r["dt"]))
 
     trades: List[Dict[str, Any]] = []
 
-    # Group by symbol and break into trade cycles
     for symbol, group in groupby(rows, key=lambda r: r["symbol"]):
         position = 0.0
         current_txs: List[Dict[str, Any]] = []
@@ -113,7 +107,7 @@ def parse_tradezero_csv(csv_text: str) -> List[Dict[str, Any]]:
                 }
             )
 
-            # When we flatten the position, close out a trade
+            # If position is flat, close the trade
             if abs(position) < 1e-8:
                 trades.append(
                     {
@@ -125,7 +119,6 @@ def parse_tradezero_csv(csv_text: str) -> List[Dict[str, Any]]:
                 )
                 current_txs = []
 
-        # Any leftover executions form an OPEN trade
         if current_txs:
             trades.append(
                 {

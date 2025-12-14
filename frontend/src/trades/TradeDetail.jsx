@@ -74,8 +74,6 @@ export function TradeDetail() {
     <div className="p-6 max-w-3xl mx-auto text-white">
       <div className="flex items-center justify-between mb-4">
         <h1 className="text-2xl font-bold">{trade.ticker} Trade Details</h1>
-
-        {/* NEW: Edit / Save / Cancel buttons */}
         {!editing ? (
           <button
             onClick={() => setEditing(true)}
