@@ -2,9 +2,13 @@ import os
 import requests
 from fastapi import APIRouter, HTTPException
 from dotenv import load_dotenv
+import time
 
 load_dotenv()
 router = APIRouter()
+_CACHE = {}
+
+TTL_SECONDS = 60 * 10
 
 API_KEY = os.getenv("ALPHA_VANTAGE_API_KEY")
 if not API_KEY:
@@ -19,6 +23,12 @@ def get_stock_data(symbol: str, start_date: str, end_date: str):
     - 20 bars after the last trade date (or as many as available)
     Using Alpha Vantage TIME_SERIES_DAILY (compact).
     """
+    key = (symbol.upper(), start_date[:10], end_date[:10])
+    now = time.time()
+
+    cached = _CACHE.get(key)
+    if cached and cached[0] > now:
+        return cached[1]
     api_key = os.getenv("ALPHA_VANTAGE_API_KEY")
     if not api_key:
         raise HTTPException(status_code=500, detail="ALPHA_VANTAGE_API_KEY not set")
@@ -93,6 +103,8 @@ def get_stock_data(symbol: str, start_date: str, end_date: str):
                 "close": float(bar["4. close"]),
             }
         )
+    
+    _CACHE[key] = (now + TTL_SECONDS, candles)
 
     return candles
 
